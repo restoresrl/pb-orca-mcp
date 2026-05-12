@@ -12,13 +12,17 @@ def test_package_imports() -> None:
 
 
 def test_orca_submodule_imports() -> None:
-    from pb_orca_mcp.orca import constants, dll, errors
+    from pb_orca_mcp.orca import constants, dll, errors, session
 
     assert constants.PBORCA_OK == 0
     assert "19.0" in dll.KNOWN_VERSIONS
     assert "22.0" in dll.KNOWN_VERSIONS
     assert "25.0" in dll.KNOWN_VERSIONS
     assert errors.OrcaError(1, "X", "msg").code == 1
+    assert constants.ORCA_ERROR_NAMES[-3] == "PBORCA_OBJNOTFOUND"
+    # Singleton: instance() returns the same object across calls.
+    session.Session._instance = None
+    assert session.Session.instance() is session.Session.instance()
 
 
 def test_cli_version() -> None:

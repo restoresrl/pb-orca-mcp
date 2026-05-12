@@ -79,10 +79,10 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 
 ### Binding ctypes — note implementative
 
-- Stringhe PB sono UTF-16 LE → `c_wchar_p` (LPCWSTR).
-- Calling convention: ORCA è `__cdecl` su Windows → `ctypes.CDLL` (non `WinDLL`).
-- Struct `PBORCA_DIRENTRY`, `PBORCA_COMPERR`, `PBORCA_HIER_DIRENTRY` ecc. → `ctypes.Structure` con `_fields_` esatto dall'header `PBORCA.H` (distribuito con PB SDK).
-- Callbacks (error/build/progress) registrati con `CFUNCTYPE(None, POINTER(...), c_void_p)`. **Le callback Python vanno tenute referenced** per tutta la durata della chiamata (altrimenti GC = crash); le mettiamo in `Session._callback_refs`.
+- Stringhe PB sono UTF-16 LE → `c_wchar_p` (LPCWSTR). Tutti i `LPTSTR` dell'header `PBORCA.H` sono Unicode (l'header definisce `PBORCA_SessionOpen` Unicode di default; `PBORCA_SessionOpenA` è la variante ANSI). Useremo sempre il path Unicode.
+- Calling convention: ORCA è `__stdcall` su Windows (`PBWINAPI_(t)` espande a `t WINAPI` nell'header, `WINAPI` = `__stdcall` su x86; su x64 il calling convention è unico). In Python ctypes serve `ctypes.WinDLL`, non `CDLL` — su x86 i pop dello stack vanno fatti dal callee, e `CDLL` rompe.
+- Struct `PBORCA_DIRENTRY`, `PBORCA_COMPERR`, `PBORCA_HIER_DIRENTRY` ecc. → `ctypes.Structure` con `_fields_` esatto dall'header `PBORCA.H` (distribuito in `<install>\SDK\ORCA\pborca.h` con PB SDK). Verificato identico su PB 19/22/25 per le firme session.
+- Callbacks (error/build/progress) registrati con `WINFUNCTYPE(None, POINTER(...), c_void_p)` (l'header tipo-defina `PBCALLBACK(r,n) r ( CALLBACK n )` dove `CALLBACK` = `__stdcall`). **Le callback Python vanno tenute referenced** per tutta la durata della chiamata (altrimenti GC = crash); le mettiamo in `Session._callback_refs`.
 - Wrapper Pythonic ritorna eccezioni `OrcaError(code, name, message)` invece di codici di ritorno raw.
 
 ### Tool MCP esposti (mapping completo API ORCA → tool)
