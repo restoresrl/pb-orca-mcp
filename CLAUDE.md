@@ -6,21 +6,19 @@ del progetto Python/MCP.
 
 ## Stato attuale
 
-**Fase 1 (Foundation) — COMPLETATA** il 2026-05-12. Scaffolding messo in piedi:
-struttura `src/pb_orca_mcp/{orca,tools}/*`, `pyproject.toml` (hatchling, deps
-mcp/pydantic/click, dev pytest/ruff/mypy), stub CLI `pb-orca-mcp serve|doctor`
-(entrambi escono con exit 2 + "not implemented"), 4 smoke test che girano
-senza PB, CI Windows matrix, docs scheletro, repo `git init -b main` (untracked).
+**Tutte le fasi 1-7 chiuse** (2026-05-12). `pyproject.toml` a `0.1.0`, 107 test pytest
+verdi (incl. `requires_pb` su PB 22.0). Il commit-test loop end-to-end è stato
+validato via MCP da Claude Code: discovery → session_open → set_liblist →
+set_current_application → compile_entry_import (happy path) → application_rebuild
+→ get_last_compile_errors → session_close.
 
-**Prossima fase: Fase 2 — Discovery & loader multi-version** (vedi [`PLAN.md`](PLAN.md) §Roadmap).
-Implementa: `discovery.py` (registry + filesystem, IDE vs runtime), `pb_target_info`
-(parser `.pbt`), `orca/dll.py` factory `load_orca(install)`, tool MCP
-`pb_discover_pb_install`. Test reali contro PB 2019 R3, 2022 R3, 2025
-(installate sulla macchina del maintainer).
+**v0.1.0 RC** è il commit `dcdb74a` ("Phase 7: packaging + docs"). Successivi:
+`1b0b45c` fix DLL load (PB runtime dir + MSVC redist dir nel search path) e
+`a8f9756` fix `compile_entry_import` ABI (lSrcSize è bytes non chars — vedi sotto).
 
-**Decisioni residue da risolvere** prima del primo push / PyPI release:
-git remote, licenza, disponibilità nome `pb-orca-mcp` su PyPI
-(vedi tabella in `PLAN.md` §"Decisioni residue").
+**Tag `v0.1.0` non ancora creato** — in attesa di un round finale di validazione
+post-fix prima di pubblicare. Decisioni residue per PyPI: licenza, disponibilità
+nome `pb-orca-mcp` (vedi tabella in `PLAN.md` §"Decisioni residue").
 
 ## Contesto
 
@@ -56,6 +54,11 @@ del file originario in `~/.claude/plans/giggly-squishing-hamster.md`).
 - **ORCA single-session per process** e non thread-safe. `asyncio.Lock` globale attorno a ogni chiamata ORCA quando il server MCP esegue tool in parallelo.
 - **x86 vs x64**: Python deve girare nella stessa arch della DLL caricata. Documentato in `docs/installation.md`.
 - **Path Windows con `\`**: ORCA è Win32-only. Accettiamo `/` in input e normalizziamo internamente con `Path` / `os.path`.
+- **`PBORCA_CompileEntryImport` lSrcSize è in BYTES, non chars**. Per Unicode (UTF-16 LE) significa `len(syntax) * 2` (NON `+1` né `len(syntax)`). Con il valore sbagliato ORCA scansiona solo metà bytes e aborta con `C0114 "Error scanning object source entry"` prima del compiler. Coperto da `test_compile_entry_import_happy_path_application` in `tests/test_session_real.py` (regression sentinel: inverti il fix e quel test fallisce con la firma C0114 esatta). Vale anche per `compile_entry_import_list`.
+- **PB source export (`.sra`/`.srf`/`.srw`/...)** è **UTF-16 LE con BOM** + **CRLF** + prima riga obbligatoria `$PBExportHeader$<name>.<ext>` (eventuale seconda riga `$PBExportComments$<comment>`). Da leggere con `path.read_bytes()` poi `raw[2:].decode("utf-16-le")` se inizia con `FF FE`. Marcati come binary in `.gitattributes` perché git deve preservarli byte-identical.
+- **Asimmetria export/import**: `library_entry_export` ritorna **solo il body** (senza `$PBExportHeader$...`), mentre `compile_entry_import` lo **richiede**. Roundtrip diretto export→import senza riattacccare l'header non funziona. La recipe in `docs/recipes.md` è imprecisa su questo punto (TODO chiarire).
+- **Bootstrap catch-22 per PBL vuote**: `SessionSetCurrentAppl` rifiuta con `PBORCA_OBJNOTFOUND (-3)` un app_name che non esiste già nella pbl, ma `CompileEntryImport` richiede current_app set anche per importare la PRIMA application. Non c'è in-API per creare l'app object iniziale di una PBL vuota — PB IDE usa un path di alto livello che ORCA non espone. Workaround per i test: ship una PBL pre-built come fixture (vedi `tests/fixtures/tiny_app/genapp.pbl`).
+- **`compile_entry_import` non è atomico**: anche su error ORCA scrive il source (eventualmente truncated) nel `.pbl`. Quindi un import fallito può corrompere il source originale dell'entry. Se servono semantiche atomiche, snapshot dei bytes della pbl prima della call e restore on failure.
 
 ## Riferimenti
 
