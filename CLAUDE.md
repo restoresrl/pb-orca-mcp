@@ -20,6 +20,20 @@ set_current_application → compile_entry_import (happy path) → application_re
 post-fix prima di pubblicare. Decisioni residue per PyPI: licenza, disponibilità
 nome `pb-orca-mcp` (vedi tabella in `PLAN.md` §"Decisioni residue").
 
+**Prossimo step (da fare dopo riavvio Claude Code)**: il fix `a8f9756`
+(`compile_entry_import` size-arg) è già nel codice e coperto da pytest, ma il
+server MCP della sessione corrente è ancora quello pre-fix (spawn all'avvio
+di Claude Code, non ricarica moduli a runtime). **Riavviare Claude Code
+con cwd in `pb-orca-mcp/`** per far ripartire il server `pb-orca` con il
+codice nuovo, poi eseguire end-to-end via MCP il **compile-test loop su una
+PBL reale**: `pb_session_open` → `pb_set_library_list` → `pb_set_current_application`
+→ `pb_library_entry_export` (legge il source) → edit lato agent → `pb_compile_entry_import`
+(rimette il source con header `$PBExportHeader$<name>.<ext>` riattaccato) →
+`pb_get_last_compile_errors` → `pb_application_rebuild`. Questo è l'ultimo
+tassello mancante per validare `v0.1.0` dal lato MCP — i pytest equivalenti
+sono già verdi, mancava solo la conferma via tool MCP che il loop funziona
+end-to-end con Claude in driver.
+
 ## Contesto
 
 `pb-orca-mcp` è un **server MCP Python** che espone l'API ORCA di
