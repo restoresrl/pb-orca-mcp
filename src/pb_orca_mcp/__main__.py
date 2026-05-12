@@ -64,6 +64,12 @@ def doctor() -> None:
         )
         sys.exit(1)
 
+    # The first arch-compatible install is the only one we attempt to load:
+    # Windows caches DLLs by basename, so the version-keyed `pbvm.dll`,
+    # `pbshr.dll` etc. from one PB install poison the namespace for any
+    # subsequent install loaded in the same process. The doctor lists
+    # everything and marks load status accordingly.
+    load_attempted = False
     usable = 0
     for inst in ides:
         marker = "[OK]" if inst.tested else "[??]"
@@ -71,6 +77,7 @@ def doctor() -> None:
         click.echo(f"    file_version : {inst.file_version or '(unknown)'}")
         click.echo(f"    product      : {inst.product_version or '(unknown)'}")
         click.echo(f"    source       : {inst.source}")
+        click.echo(f"    runtime      : {inst.runtime_path or '(not found)'}")
 
         if inst.arch != py_arch:
             click.echo(
@@ -79,6 +86,14 @@ def doctor() -> None:
             )
             click.echo("")
             continue
+        if load_attempted:
+            click.echo(
+                "    skip load    : another PB install already loaded in this "
+                "process (single PB runtime per process)"
+            )
+            click.echo("")
+            continue
+        load_attempted = True
         try:
             api = load_orca(inst)
         except OrcaArchMismatchError as exc:

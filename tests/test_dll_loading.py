@@ -15,12 +15,20 @@ def _python_is_x86() -> bool:
 
 
 @pytest.mark.requires_pb
-@pytest.mark.parametrize("version", ["22.0", "25.0"])
-def test_load_orca_succeeds_for_tested_versions(version: str) -> None:
+def test_load_orca_succeeds_for_a_tested_version() -> None:
+    """Load the first available tested PB install.
+
+    We intentionally don't loop over PB 22 *and* 25 in the same process:
+    each `pborc.dll` pulls its own version-specific `pbvm.dll` into the
+    process, and Windows caches DLLs by basename — so loading PB 22 first
+    leaves a PB 22 runtime in memory that PB 25's `pborc.dll` then binds
+    to, with ABI-incompatible results. This is the same single-session-
+    per-process constraint that applies to ORCA itself.
+    """
     ides, _ = discover_pb_installations()
-    candidates = [i for i in ides if i.version == version]
+    candidates = [i for i in ides if i.version in ("22.0", "25.0")]
     if not candidates:
-        pytest.skip(f"PB {version} not installed on this machine")
+        pytest.skip("none of the tested PB versions (22.0/25.0) are installed")
     install = candidates[0]
     if install.arch == "x86" and not _python_is_x86():
         with pytest.raises(OrcaArchMismatchError):
@@ -29,7 +37,7 @@ def test_load_orca_succeeds_for_tested_versions(version: str) -> None:
     api = load_orca(install)
     assert api.install is install
     assert api.dll is not None
-    assert api.tested is (version in KNOWN_VERSIONS)
+    assert api.tested is (install.version in KNOWN_VERSIONS)
 
 
 @pytest.mark.requires_pb
@@ -56,6 +64,7 @@ def test_load_orca_arch_mismatch_is_explicit() -> None:
         install_path=real.install_path,
         ide_path=real.ide_path,
         orca_dll=real.orca_dll,
+        runtime_path=real.runtime_path,
         tested=real.tested,
         source=real.source,
     )

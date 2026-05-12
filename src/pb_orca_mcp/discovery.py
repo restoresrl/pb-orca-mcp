@@ -68,6 +68,12 @@ class PbInstall:
     """`<install_path>\\IDE`."""
     orca_dll: str
     """`<install_path>\\IDE\\pborc.dll`."""
+    runtime_path: str | None
+    """`<appeon_root>\\Common\\PowerBuilder\\Runtime <file_version>\\` (or its `\\x64\\`
+    subdir on x64 installs) — holds `pbvm.dll`, `pbshr.dll` etc. that `pborc.dll`
+    imports. `None` when `file_version` is unknown or the directory doesn't exist
+    on disk. The loader adds this to the DLL search path so `WinDLL(orca_dll)`
+    can resolve the runtime imports."""
     tested: bool
     """`True` if `version` is in `KNOWN_VERSIONS`."""
     source: str
@@ -295,6 +301,7 @@ def _build_install(
         fv, pv = read_pe_file_version(orca_dll)
         file_version = file_version or fv
         product_version = product_version or pv
+    runtime_path = _locate_runtime(install_path, file_version, arch)
     return PbInstall(
         version=version or "",
         file_version=file_version,
@@ -303,6 +310,30 @@ def _build_install(
         install_path=install_path,
         ide_path=ide_path,
         orca_dll=orca_dll,
+        runtime_path=runtime_path,
         tested=(version in KNOWN_VERSIONS) if version else False,
         source=source,
     )
+
+
+def _locate_runtime(install_path: str, file_version: str | None, arch: PeArch) -> str | None:
+    """Compute the PB runtime directory for this install.
+
+    Layout observed on PB 19/22/25:
+
+        <appeon_root>\\PowerBuilder <X.0>\\IDE\\pborc.dll     <- the install
+        <appeon_root>\\Common\\PowerBuilder\\Runtime <file_version>\\pbvm.dll
+        <appeon_root>\\Common\\PowerBuilder\\Runtime <file_version>\\x64\\pbvm.dll
+
+    `<appeon_root>` is the parent of the install directory (typically
+    `C:\\Program Files (x86)\\Appeon`). The runtime is keyed by the full
+    file version (`Build` from the registry), not the major; each PB
+    upgrade leaves the previous runtime in place alongside the new one.
+    """
+    if not file_version:
+        return None
+    appeon_root = os.path.dirname(install_path)
+    base = os.path.join(appeon_root, "Common", "PowerBuilder", f"Runtime {file_version}")
+    if arch == "x64":
+        base = os.path.join(base, "x64")
+    return base if os.path.isdir(base) else None

@@ -25,6 +25,7 @@ phases 4-6.
 from __future__ import annotations
 
 import ctypes
+import os
 import struct
 import sys
 from ctypes import POINTER, WINFUNCTYPE, c_int, c_long, c_void_p, c_wchar_p
@@ -353,10 +354,32 @@ def load_orca(install: PbInstall) -> OrcaApi:
         )
     if sys.platform != "win32":
         raise OrcaLoadError(f"pborc.dll is Windows-only; running on {sys.platform!r}")
+    # `pborc.dll` has imports across three directories:
+    # - `<install>\IDE\`                              -> mainview.dll, libcrypto-3.dll, pbcmp.dll, …
+    # - `<install>\`                                  -> the MSVC redistributable
+    #                                                    (msvcp140.dll, vcruntime140.dll)
+    # - `<appeon_root>\Common\PowerBuilder\Runtime N\`-> pbvm.dll, pbshr.dll (the PB
+    #                                                    runtime; build-versioned)
+    # Python 3.8+ on Windows stopped auto-adding the DLL's own directory
+    # to the dependency search path, so without explicit hints LoadLibrary
+    # fails with "Could not find module ... (or one of its dependencies)"
+    # even though `pborc.dll` itself is at the path we hand it.
+    # `runtime_path` may be None when discovery didn't find the runtime
+    # directory; in that case the load may still fail with the same error.
+    search_dirs = [install.ide_path, install.install_path]
+    if install.runtime_path:
+        search_dirs.append(install.runtime_path)
+    added: list[Any] = []
     try:
-        dll = ctypes.WinDLL(install.orca_dll)
-    except OSError as exc:
-        raise OrcaLoadError(f"Failed to load {install.orca_dll}: {exc}") from exc
+        try:
+            for d in search_dirs:
+                added.append(os.add_dll_directory(d))
+            dll = ctypes.WinDLL(install.orca_dll)
+        except OSError as exc:
+            raise OrcaLoadError(f"Failed to load {install.orca_dll}: {exc}") from exc
+    finally:
+        for handle in added:
+            handle.close()
     try:
         session = _bind_session_fns(dll)
         library = _bind_library_fns(dll)
