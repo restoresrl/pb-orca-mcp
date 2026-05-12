@@ -14,7 +14,7 @@ L'obiettivo è un **server MCP generico** (non specifico a un singolo vendor o w
 
 - **Multi-version PB IDE come requisito core (non rinviato)**: il server v1 deve riconoscere e caricare DLL distinte da installazioni PB coesistenti sulla stessa macchina (es. PB 2019 R3 + 2022 R3 + 2025 in parallelo). Tutte le release shipano la stessa DLL `pborc.dll` (no suffisso versione) dentro `<install>\IDE\`; il loader sceglie l'installazione corretta per ogni target invece di puntare a una sola installazione globale.
 - **Discovery con distinzione IDE vs runtime**: l'installer PowerBuilder genera due famiglie di installazione — "IDE" (contiene `PowerBuilder.exe`, `pborc.dll`, SDK headers) e "runtime" (solo VM PB, senza ORCA). Il discovery deve **filtrare e ignorare le installazioni runtime-only** e segnalarle in `pb_discover_pb_install` come "ORCA not available" invece di crashare al primo `LoadLibrary`.
-- **Inferenza versione dal `.pbt`**: la prima riga di un `.pbt` contiene un identificatore di versione PowerBuilder (`PBExportHeader$...pbt` + direttiva version). Il server espone un tool `pb_target_info` che apre il `.pbt`, ne estrae versione/AppName/LibList, e permette agli altri tool (Compile, Rebuild) di scegliere automaticamente quale DLL caricare. Riduce la necessità di passare la versione manualmente.
+- **Selezione versione PB esplicita**: il chiamante deve sempre indicare quale installazione PB usare, via `pb_version` (es. `"22.0"`) o `install_path` esplicito al momento di `pb_session_open`. Niente auto-pick, niente inferenza da `.pbt`/`.pbw`: i file di progetto/workspace PB **non contengono la versione PB** — l'unico header presente è il magic costante `Save Format v3.0(19990112)` (format del file, congelato dal 1999). Il tool `pb_target_info` resta utile per estrarre `appname`/`applib`/`lib_list`/`type` (e per `.pbw`, lista dei target), ma non popola `pb_version`. Eventuale inferenza dall'header binario delle PBL è valutabile in una fase successiva, non è in v1.
 - **Linguaggio**: Python 3.10+, binding con `ctypes`. SDK MCP `mcp` (ufficiale Anthropic).
 - **Distribuzione**: package PyPI `pb-orca-mcp`, installabile con `uv tool install` / `pipx install`. Snippet `.claude/mcp.json` per integrazione.
 - **Architettura**: l'arch del runtime Python deve coincidere con l'arch della `pborc.dll` caricata (storicamente l'IDE PB è x86; alcune release recenti hanno anche build x64). Il discovery riporta l'arch per ogni installazione e il loader rifiuta mismatch con un errore comprensibile.
@@ -90,8 +90,8 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | Tool MCP | Funzione ORCA | Note |
 |---|---|---|
 | `pb_discover_pb_install` | (registry/env scan) | Ritorna **lista** di installazioni PB IDE valide (con versione + arch + path DLL), escludendo i runtime-only |
-| `pb_target_info` | (parser `.pbt`) | Estrae versione PB, AppName, LibList e tipo target dal `.pbt`; usato per inferenza versione automatica |
-| `pb_session_open` | `PBORCA_SessionOpen` | Auto-discovery se `install_path` non passato; accetta `pb_version` esplicito (es. "19.0", "22.0", "25.0") |
+| `pb_target_info` | (parser `.pbt`/`.pbw`) | Estrae AppName, applib, LibList, type dal `.pbt`; per `.pbw` lista dei target. **Non** ritorna `pb_version` (i file di progetto/workspace PB non la contengono, vedi §"Parser `.pbt` / `.pbw`") |
+| `pb_session_open` | `PBORCA_SessionOpen` | Richiede selezione esplicita dell'installazione: parametro `install_path` oppure `pb_version` (es. "19.0", "22.0", "25.0"). Nessuna inferenza automatica |
 | `pb_session_close` | `PBORCA_SessionClose` | |
 | `pb_set_current_application` | `PBORCA_SessionSetCurrentAppl` | Setta target/PBT/LibList |
 | `pb_set_library_list` | `PBORCA_SessionSetLibraryList` | Override LibList post-open |
@@ -161,13 +161,13 @@ Errori di compile arrivano come array strutturato:
 `discovery.py` enumera **tutte** le installazioni PB IDE presenti sulla macchina e ritorna una lista strutturata. Sorgenti consultate (unite, dedup):
 
 1. Env var `PB_INSTALL_PATH` (override esplicito; può essere lista CSV).
-2. Registry: `HKLM\SOFTWARE\Sybase\PowerBuilder\<X.0>\Location` (e `WOW6432Node` equivalente). Appeon ha mantenuto la chiave legacy Sybase. Le subkey trovate (`19.0`, `22.0`, `25.0`, …) sono i candidati major version.
-3. Filesystem scan dei path standard: `C:\Program Files\Appeon\PowerBuilder *.0\` e `C:\Program Files (x86)\Appeon\PowerBuilder *.0\` (l'IDE PB è storicamente x86).
+2. Registry: `HKLM\SOFTWARE\WOW6432Node\Sybase\PowerBuilder\<X.0>` (e hive 64-bit equivalente). Appeon ha mantenuto la chiave legacy Sybase — la chiave `HKLM\SOFTWARE\Sybase\PowerBuilder` (senza `WOW6432Node`) **non esiste** sulle macchine osservate. Le subkey trovate (`19.0`, `22.0`, `25.0`, …) sono i candidati major version. Per ogni subkey i valori utili sono: `Location` (= **parent** directory, es. `C:\Program Files (x86)\Appeon`, **non** l'install dir esatta), `IPS Name` (= subdir, es. `PowerBuilder 22.0`), `Build` (= file version completa, es. `22.2.0.3397`), `BuildFlag` (= product version human-readable, es. `2022 R3`), `VersionMajor`/`VersionMinor`. L'install dir si ricostruisce come `Location + "\" + "IPS Name"`.
+3. Filesystem scan dei path standard: `C:\Program Files\Appeon\PowerBuilder *.0\` e `C:\Program Files (x86)\Appeon\PowerBuilder *.0\` (l'IDE PB è storicamente x86). Filtrare i sibling con stesso prefisso ma diverso ruolo (`PowerBuilderUtilities X.0\`, `PowerBuilder Installer\`, `Runtime Packager\`, `PowerBuilderCompiler X.0\` — tutti privi di `IDE\pborc.dll`).
 
 Per ogni candidato verifica:
-- Presenza di `<install>\IDE\pborc.dll` (no suffisso versione: il nome è invariato fra release). **Se manca → è un'installazione "runtime" o non-IDE, scartata** e segnalata separatamente nel return.
-- Architettura della DLL (PE header: x86 vs x64).
-- Versione esatta dal `VersionInfo` PE: `FileVersion` (es. `22.2.0.3397`) e `ProductVersion` (testo human-readable, es. `2022 R3 Build 3397`).
+- Presenza di `<install>\IDE\pborc.dll` (no suffisso versione: il nome è invariato fra release; **case varia**: PB 19.0 ship `PBORC.DLL` uppercase, PB 22.0/25.0 lowercase — Windows filesystem è case-insensitive comunque). **Se manca → è un'installazione "runtime" o non-IDE, scartata** e segnalata separatamente nel return.
+- Architettura della DLL (PE header `Machine` field a offset `0x3C → PE+4`: `0x14c` = x86, `0x8664` = x64). Implementato in `_pe.py` con `struct.unpack`, senza dipendenze esterne.
+- Versione esatta. **Sorgente primaria: registry** (campi `Build` + `BuildFlag` già normalizzati). **Fallback se l'install è stata trovata solo via filesystem**: `VersionInfo` PE del DLL — `FileVersion` (es. `22.2.0.3397`) e `ProductVersion` (testo human-readable, es. `2022 R3 Build 3397`).
 
 Output di `pb_discover_pb_install`:
 
@@ -214,23 +214,65 @@ Output di `pb_discover_pb_install`:
 
 La sessione ORCA è singleton **per process**, ma il `Session` object ricorda quale `PbInstall` ha aperto: switch di versione = close + reopen.
 
-### Inferenza versione da `.pbt`
+### Parser `.pbt` / `.pbw`
 
-Il `.pbt` (text format) ha intestazione con direttiva `PBExportHeader$<nome>.pbt` + righe successive che includono `PBHeader$` e, nei target moderni, `PBProjectVersion`. Tool `pb_target_info`:
+Il `.pbt` (text format) e il `.pbw` (workspace) condividono la stessa sintassi minimale. Formato verificato su 5 `.pbt` + 3 `.pbw` reali sulla macchina di sviluppo (PB 19, 22, 25):
+
+```
+Save Format v3.0(19990112)        <- magic header costante (format-version del file, non versione PB)
+@begin Projects                    <- blocco opzionale (lista progetti embedded nel .pbt)
+ 0 "1&p_main&main.pbl";
+@end;
+appname "myapp";
+applib "myapp.pbl";
+LibList "myapp.pbl;..\\dep\\rstpb_core.pbl;..\\dep\\pbunit.pbd";
+type "pb";                          <- pb | component | asm | ...
+```
+
+`.pbw` (workspace):
+
+```
+Save Format v3.0(19990112)
+@begin Targets
+ 0 "src\\main.pbt";
+ 1 "src\\tools.pbt";
+@end;
+DefaultTarget "src\\main.pbt";
+DefaultExportEncode "UTF-8";        <- opzionale
+DefaultRemoteTarget "src\\main.pbt";
+```
+
+Note:
+- Magic header `Save Format v3.0(19990112)` è **costante** (data di freeze del formato Sybase, 1999-01-12). **Non identifica la versione PB**.
+- Keyword sono case-insensitive (`LibList` ↔ `liblist` osservati nello stesso codebase).
+- Stringhe usano escape stile C-string per i backslash dei path (`..\\dep\\rstpb_core.pbl`).
+- `LibList` separa con `;`.
+- I file PB di progetto/workspace **non contengono la versione PowerBuilder** (verificato su `.pbt` PB 19, 22, 25 e `.pbw` di workspace mw24/mw25). La selezione della DLL ORCA è quindi sempre esplicita lato chiamante.
+
+Tool `pb_target_info`:
 
 ```json
-// input: {"pbt_path": "C:\\projects\\foo\\foo.pbt"}
-// output:
+// input: {"path": "C:\\projects\\foo\\foo.pbt"}
+// output (caso .pbt):
 {
-  "target_name": "foo",
-  "pb_version": "22.0",
-  "app_name": "foo",
+  "kind": "pbt",
+  "target_name": "foo",        // dal nome file
+  "app_name": "foo",           // da `appname`
+  "app_lib": "foo.pbl",        // da `applib`
   "lib_list": ["foo.pbl", "..\\dep\\bar.pbl"],
-  "type": "application"  // application | component | extension
+  "type": "pb"                  // da `type`
+}
+
+// output (caso .pbw):
+{
+  "kind": "pbw",
+  "workspace_name": "myworkspace",
+  "targets": ["src\\main.pbt", "src\\tools.pbt"],
+  "default_target": "src\\main.pbt"
 }
 ```
 
-I tool successivi (`pb_session_open`, `pb_set_current_application`, `pb_application_rebuild`) possono accettare il `.pbt` direttamente e usare la versione dedotta per scegliere la DLL, evitando al chiamante di indicarla a mano.
+Non c'è inferenza versione: `pb_session_open` riceve `install_path` o `pb_version` direttamente dal chiamante (vedi §"Decisioni di scope").
 
 ### Configurazione
 
@@ -264,7 +306,7 @@ Snippet documentato in `docs/claude-code-setup.md`:
 | Fase | Contenuto | Stima |
 |---|---|---|
 | **1 — Foundation** | Repo skeleton, `pyproject.toml`, server MCP entry point vuoto, fixture `tests/fixtures/tiny_app/`, CI Windows. | 1-2 gg |
-| **2 — Discovery & loader multi-version** | `discovery.py` (registry+filesystem, IDE vs runtime), `pb_target_info` (parser `.pbt`), `orca/dll.py` factory `load_orca(install)`, tool `pb_discover_pb_install`. Test reali contro PB 19.0, 22.0, 25.0. | 2-3 gg |
+| **2 — Discovery & loader multi-version** | `discovery.py` (registry+filesystem, IDE vs runtime, ricostruzione install dir da `Location`+`IPS Name`), `_pe.py` (PE Machine field via `struct`), `pb_target_info` parser `.pbt`/`.pbw` (no inferenza versione), `orca/dll.py` factory `load_orca(install)`, tool `pb_discover_pb_install`. Test reali contro PB 19.0, 22.0, 25.0. | 2-3 gg |
 | **3 — Session & application** | `PBORCA_SessionOpen/Close`, `SessionSetCurrentAppl`, `SessionSetLibraryList`. Singleton `Session` con tracking version+arch. | 1-2 gg |
 | **4 — Library ops** | Tool MCP per Create/Delete/Directory/EntryInfo/Export/Delete/Move/Comment + struct ctypes (`PBORCA_DIRENTRY` ecc.). | 2-3 gg |
 | **5 — Compile loop (core value)** | Callback infrastructure (CFUNCTYPE), buffer errori, `CompileEntryImport(List)`, `ApplicationRebuild`, `pb_get_last_compile_errors`. | 3-4 gg |
