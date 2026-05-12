@@ -42,8 +42,8 @@ dev = [
 pb-orca-mcp = "pb_orca_mcp.__main__:cli"
 
 [project.urls]
-Homepage = "https://github.com/carlotorrese/pb-orca-mcp"
-Issues = "https://github.com/carlotorrese/pb-orca-mcp/issues"
+Homepage = "https://github.com/restoresrl/pb-orca-mcp"
+Issues = "https://github.com/restoresrl/pb-orca-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pb_orca_mcp"]

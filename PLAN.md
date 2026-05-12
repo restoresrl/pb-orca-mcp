@@ -326,6 +326,8 @@ Tutti i path relativi alla root del repository:
 
 | Decisione | Quando va presa | Opzioni emerse |
 |---|---|---|
-| **Git remote** del nuovo repo | Al primo `git push` (post-scaffolding) | GitHub public / private organization / local-only per ora |
 | **Licenza** | Prima di publish PyPI | MIT (raccomandata per package general-purpose) / Apache 2.0 / proprietaria |
 | **Disponibilità nome `pb-orca-mcp` su PyPI** | Prima di pubblicare la v0.1 | Check `pip index versions pb-orca-mcp` + reserve squat. Alternative se occupato: `powerbuilder-orca-mcp`, `pb-orca` |
+
+Decisioni risolte:
+- ✅ **Git remote**: `https://github.com/restoresrl/pb-orca-mcp` (private GitHub org Restore srl), pushed 2026-05-12.
