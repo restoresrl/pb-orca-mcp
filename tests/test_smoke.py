@@ -37,3 +37,17 @@ def test_cli_doctor_stub_exits_nonzero() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["doctor"])
     assert result.exit_code == 2
+
+
+def test_discovery_is_importable_and_returns_tuple() -> None:
+    """Phase 2: `discover_pb_installations()` is callable everywhere.
+
+    On CI / non-Windows hosts it just returns two empty lists; on a dev
+    machine with PB installed it returns populated ones. Either is fine
+    here — we only check the contract.
+    """
+    from pb_orca_mcp.discovery import discover_pb_installations
+
+    ides, runtime = discover_pb_installations()
+    assert isinstance(ides, list)
+    assert isinstance(runtime, list)
