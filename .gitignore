@@ -59,6 +59,10 @@ Thumbs.db
 
 # Claude Code local settings (per-machine permissions / state)
 .claude/settings.local.json
+.claude/mcp.json
+
+# arch-specific venvs (created on the dev machine, not committed)
+.venv-x86/
 
 # uv
 uv.lock
