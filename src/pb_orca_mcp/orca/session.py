@@ -357,7 +357,7 @@ class Session:
         try:
             rc = state.api.compile.CompileEntryImport(
                 state.handle, lib_path, entry_name, type_code, comments,
-                syntax, len(syntax) + 1, callback, None,
+                syntax, len(syntax) * 2, callback, None,
             )
         finally:
             self._drop_callback(state, callback)
@@ -380,7 +380,7 @@ class Session:
         types = (ctypes.c_int * n)(*[entry_type_from_name(i["entry_type"]) for i in items])
         comments = (ctypes.c_wchar_p * n)(*[i.get("comments", "") for i in items])
         syntaxes = (ctypes.c_wchar_p * n)(*[i["syntax"] for i in items])
-        sizes = (c_long * n)(*[len(i["syntax"]) + 1 for i in items])
+        sizes = (c_long * n)(*[len(i["syntax"]) * 2 for i in items])
         callback, errors = self._make_errproc(state)
         try:
             rc = state.api.compile.CompileEntryImportList(

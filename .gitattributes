@@ -1,0 +1,16 @@
+# PB source export files are UTF-16 LE with BOM and CRLF — keep them
+# byte-identical so the roundtrip fixture parses correctly on every host.
+*.sra binary
+*.srf binary
+*.srw binary
+*.srm binary
+*.sru binary
+*.srd binary
+*.srq binary
+*.srs binary
+*.srp binary
+*.srj binary
+
+# PB library binary files
+*.pbl binary
+*.pbd binary

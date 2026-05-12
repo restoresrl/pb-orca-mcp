@@ -153,10 +153,80 @@ def test_compile_entry_import_returns_structured_response(tmp_path: Path) -> Non
             return
         assert success is False
         assert isinstance(errors, list)
-        # If ORCA reported diagnostics, they must have line/column ints.
+        # If ORCA reported diagnostics, they must have line/column ints. Also
+        # guard against a regression of the `len(syntax) + 1` size-arg bug
+        # (fixed: now `len(syntax) * 2`) — that bug produced C0114 "Error
+        # scanning object source entry" instead of the genuine syntax error.
         for err in errors:
             assert isinstance(err["line"], int)
             assert isinstance(err["column"], int)
             assert isinstance(err["message_text"], str)
+            assert "C0114" not in err["message_text"], (
+                "C0114 'Error scanning object source entry' suggests the "
+                "compile size-arg regression is back — see commit message"
+            )
+    finally:
+        session.close()
+
+
+_FIXTURES = Path(__file__).parent / "fixtures" / "tiny_app"
+
+
+def _read_pb_source(path: Path) -> str:
+    """Decode a PB `.sr*` export file (UTF-16 LE with BOM) to a Python str."""
+    raw = path.read_bytes()
+    if raw.startswith(b"\xff\xfe"):
+        return raw[2:].decode("utf-16-le")
+    if raw.startswith(b"\xfe\xff"):
+        return raw[2:].decode("utf-16-be")
+    return raw.decode("utf-8")
+
+
+@pytest.mark.requires_pb
+def test_compile_entry_import_happy_path_application(tmp_path: Path) -> None:
+    """Roundtrip a real PB-IDE-exported application source into a fresh PBL.
+
+    This is the test that would have caught the `len(syntax) + 1` size-arg
+    bug. The broken-source test above can't catch it because any size value
+    produces `success=False` for a syntactically invalid input. Only a
+    happy-path import — valid source → `success=True` — distinguishes
+    "size argument was correct" from "size argument was wrong".
+
+    Setup: create empty PBL, set LibList, declare `genapp` as the current
+    application (ORCA accepts a not-yet-existing name; it's stored on the
+    session). Then import the wizard-generated `genapp.sra` fixture and
+    assert the directory listing confirms the new entry.
+    """
+    loaded = _open_pb22_or_skip()
+    if loaded is None:
+        return
+    _target, api = loaded
+
+    # Copy the pre-built PBL fixture (PB 22.0 wizard output containing
+    # `genapp` as an application object) to a temp path so we can write
+    # to it without disturbing the source-controlled fixture.
+    import shutil
+    pbl_src = _FIXTURES / "genapp.pbl"
+    pbl = str(tmp_path / "genapp.pbl")
+    shutil.copyfile(pbl_src, pbl)
+
+    session = Session.instance()
+    session.open(api)
+    try:
+        session.set_library_list([pbl])
+        # `genapp` already exists in the fixture → SessionSetCurrentAppl
+        # succeeds. This sidesteps the empty-PBL bootstrap catch-22.
+        session.set_current_application(pbl, "genapp")
+
+        syntax = _read_pb_source(_FIXTURES / "genapp.sra")
+        success, errors = session.compile_entry_import(
+            pbl, "genapp", "application", syntax, "happy-path import"
+        )
+        assert success is True, f"compile failed: errors={errors}"
+        assert errors == []
+
+        _comment, entries = session.library_directory(pbl)
+        names = {e["name"] for e in entries}
+        assert "genapp" in names, f"genapp not in PBL after import; entries={names}"
     finally:
         session.close()
