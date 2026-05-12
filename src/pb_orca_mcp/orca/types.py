@@ -60,3 +60,51 @@ class PBORCA_COMPERR(Structure):
         ("iColumnNumber", c_uint),
         ("iLineNumber", c_uint),
     ]
+
+
+class PBORCA_LINKERR(Structure):
+    """Callback record for `PBORCA_LNKPROC` (executable-build link errors)."""
+
+    _fields_ = [
+        ("lpszMessageText", c_wchar_p),
+    ]
+
+
+class PBORCA_HIERARCHY(Structure):
+    """Callback record for `PBORCA_HIERPROC` (`ObjectQueryHierarchy` ancestor chain)."""
+
+    _fields_ = [
+        ("lpszAncestorName", c_wchar_p),
+    ]
+
+
+class PBORCA_REFERENCE(Structure):
+    """Callback record for `PBORCA_REFPROC` (`ObjectQueryReference` — who refs whom)."""
+
+    _fields_ = [
+        ("lpszLibraryName", c_wchar_p),
+        ("lpszEntryName", c_wchar_p),
+        ("otEntryType", c_int),
+        ("otEntryRefType", c_int),
+    ]
+
+
+class PBORCA_EXEINFO(Structure):
+    """Optional version-info struct for `PBORCA_SetExeInfo` before `ExecutableCreate`.
+
+    All fields are nullable `LPTSTR`; pass `None` to leave a field unset.
+    Each populated field maps to the corresponding Windows VS_VERSION_INFO
+    string entry in the produced `.exe`.
+    """
+
+    _fields_ = [
+        ("lpszCompanyName", c_wchar_p),
+        ("lpszProductName", c_wchar_p),
+        ("lpszDescription", c_wchar_p),
+        ("lpszCopyright", c_wchar_p),
+        ("lpszFileVersion", c_wchar_p),
+        ("lpszFileVersionNum", c_wchar_p),
+        ("lpszProductVersion", c_wchar_p),
+        ("lpszProductVersionNum", c_wchar_p),
+        ("lpszManifestInfo", c_wchar_p),
+    ]

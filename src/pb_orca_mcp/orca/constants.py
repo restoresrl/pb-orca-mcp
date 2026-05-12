@@ -175,3 +175,76 @@ COMPILE_LEVEL_NAMES: dict[int, str] = {
 def compile_level_to_name(level: int) -> str:
     """Map a `PBORCA_COMPERR.iLevel` int to a string severity, falling back to `unknown(N)`."""
     return COMPILE_LEVEL_NAMES.get(level, f"unknown({level})")
+
+
+# Reference types (`enum pborca_reftype` in PBORCA.H).
+PBORCA_REFTYPE_SIMPLE = 0
+PBORCA_REFTYPE_OPEN = 1
+
+REFTYPE_NAMES: dict[int, str] = {
+    PBORCA_REFTYPE_SIMPLE: "simple",
+    PBORCA_REFTYPE_OPEN: "open",
+}
+
+
+def reftype_to_name(value: int) -> str:
+    """Map a `PBORCA_REFTYPE` int to its string name."""
+    return REFTYPE_NAMES.get(value, f"unknown({value})")
+
+
+# Executable / dynamic-library `lFlags` bitfield (from PBORCA.H).
+# Bit 0: code generation mode (0=p-code, 1=machine-code).
+PBORCA_P_CODE = 0x00000000
+PBORCA_MACHINE_CODE = 0x00000001
+PBORCA_MACHINE_CODE_NATIVE = 0x00000001
+# Bit 4-5: debug context.
+PBORCA_TRACE_INFO = 0x00000010
+PBORCA_ERROR_CONTEXT = 0x00000020
+# Bit 8-9: optimization.
+PBORCA_MACHINE_CODE_OPT = 0x00000100
+PBORCA_MACHINE_CODE_OPT_SPEED = 0x00000100
+PBORCA_MACHINE_CODE_OPT_SPACE = 0x00000200
+PBORCA_MACHINE_CODE_OPT_NONE = 0x00000000
+# Bit 10: visual style.
+PBORCA_NEW_VISUAL_STYLE_CONTROLS = 0x00000400
+# Bit 11: x64 deployment.
+PBORCA_X64 = 0x00000800
+
+BUILD_FLAG_NAMES: dict[str, int] = {
+    "p_code": PBORCA_P_CODE,
+    "machine_code": PBORCA_MACHINE_CODE,
+    "trace_info": PBORCA_TRACE_INFO,
+    "error_context": PBORCA_ERROR_CONTEXT,
+    "optimize_speed": PBORCA_MACHINE_CODE_OPT_SPEED,
+    "optimize_space": PBORCA_MACHINE_CODE_OPT_SPACE,
+    "new_visual_style": PBORCA_NEW_VISUAL_STYLE_CONTROLS,
+    "x64": PBORCA_X64,
+}
+"""Subset of `PBORCA_*` build flags safe to expose by name in MCP tools.
+
+p-code mode is the default (`lFlags=0`). Pocket PB targets (PPCARM/PPCX86/
+SPHONE*) are intentionally omitted — they are legacy and don't apply to
+modern PB development."""
+
+
+def build_flags_from_names(names: list[str] | None) -> int:
+    """OR-fold a list of build-flag names into a single `lFlags` int.
+
+    `None` or empty list → `0` (p-code, no debug, no optimization).
+    Raises `ValueError` on any unknown name.
+    """
+    if not names:
+        return 0
+    result = 0
+    unknown: list[str] = []
+    for name in names:
+        key = name.lower()
+        flag = BUILD_FLAG_NAMES.get(key)
+        if flag is None:
+            unknown.append(name)
+        else:
+            result |= flag
+    if unknown:
+        valid = ", ".join(sorted(BUILD_FLAG_NAMES))
+        raise ValueError(f"unknown build flag(s): {unknown}; valid: {valid}")
+    return result

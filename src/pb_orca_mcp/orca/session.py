@@ -39,13 +39,15 @@ from pb_orca_mcp.orca.constants import (
     PBORCA_LINKERROR,
     PBORCA_MSGBUFFER,
     PBORCA_OK,
+    build_flags_from_names,
     compile_level_to_name,
     entry_type_from_name,
     entry_type_to_name,
     rebuild_type_from_name,
+    reftype_to_name,
 )
 from pb_orca_mcp.orca.errors import OrcaError
-from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO
+from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO, PBORCA_EXEINFO
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
@@ -472,6 +474,171 @@ class Session:
         if rc in (PBORCA_COMPERROR, PBORCA_LINKERROR):
             return False, errors
         raise self._build_error(rc)
+
+    # --------------------------- build group ---------------------------
+
+    def set_exe_info(self, info: dict[str, str | None]) -> None:
+        """`PBORCA_SetExeInfo(handle, &PBORCA_EXEINFO)` — populate version metadata.
+
+        Keys (all optional, omit or pass None to skip): `company_name`,
+        `product_name`, `description`, `copyright`, `file_version`,
+        `file_version_num`, `product_version`, `product_version_num`,
+        `manifest_info`. Each maps to the Windows VS_VERSION_INFO entry
+        on the produced `.exe`.
+        """
+        state = self._require_open("set_exe_info")
+        exe = PBORCA_EXEINFO()
+        exe.lpszCompanyName = info.get("company_name")
+        exe.lpszProductName = info.get("product_name")
+        exe.lpszDescription = info.get("description")
+        exe.lpszCopyright = info.get("copyright")
+        exe.lpszFileVersion = info.get("file_version")
+        exe.lpszFileVersionNum = info.get("file_version_num")
+        exe.lpszProductVersion = info.get("product_version")
+        exe.lpszProductVersionNum = info.get("product_version_num")
+        exe.lpszManifestInfo = info.get("manifest_info")
+        rc = state.api.build.SetExeInfo(state.handle, pointer(exe))
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def build_executable(
+        self,
+        exe_name: str,
+        *,
+        icon_name: str | None = None,
+        pbr_name: str | None = None,
+        flags: list[str] | None = None,
+        pbd_flags: list[list[str]] | None = None,
+        exe_info: dict[str, str | None] | None = None,
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """`PBORCA_ExecutableCreate` with optional `SetExeInfo` first.
+
+        - `flags`: build flag names for the EXE itself (`machine_code`,
+          `optimize_speed`, `trace_info`, `error_context`, `x64`, …; see
+          `BUILD_FLAG_NAMES`).
+        - `pbd_flags`: per-PBD flag-name lists (one inner list per PBL the
+          application links via the library list, excluding the application
+          PBL itself). If supplied, ORCA generates a `.pbd` per element
+          with that flag set; if `None`, no PBDs are built.
+        - `exe_info`: if not `None`, calls `set_exe_info` before
+          `ExecutableCreate`.
+
+        Returns `(success, link_errors)`; per-error dicts carry
+        `message_text`.
+        """
+        state = self._require_open("build_executable")
+        flag_int = build_flags_from_names(flags)
+        if exe_info is not None:
+            self.set_exe_info(exe_info)
+        if pbd_flags:
+            pbd_array_type = ctypes.c_int * len(pbd_flags)
+            pbd_array = pbd_array_type(*[build_flags_from_names(p) for p in pbd_flags])
+            num_pbd = len(pbd_flags)
+        else:
+            pbd_array = None
+            num_pbd = 0
+        callback, errors = self._make_linkproc(state)
+        try:
+            rc = state.api.build.ExecutableCreate(
+                state.handle, exe_name, icon_name, pbr_name,
+                callback, None,
+                pbd_array, num_pbd, flag_int, None,
+            )
+        finally:
+            self._drop_callback(state, callback)
+        state.last_compile_errors = list(errors)
+        if rc == PBORCA_OK:
+            return True, errors
+        if rc == PBORCA_LINKERROR:
+            return False, errors
+        raise self._build_error(rc)
+
+    def build_dynamic_library(
+        self, lib_path: str, *, pbr_name: str | None = None, flags: list[str] | None = None
+    ) -> None:
+        """`PBORCA_DynamicLibraryCreate(handle, lib, pbr, lFlags, NULL)` — build a single PBD."""
+        state = self._require_open("build_dynamic_library")
+        flag_int = build_flags_from_names(flags)
+        rc = state.api.build.DynamicLibraryCreate(
+            state.handle, lib_path, pbr_name, flag_int, None
+        )
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def object_query_hierarchy(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> list[str]:
+        """`PBORCA_ObjectQueryHierarchy` — return the ancestor chain as a list of names.
+
+        Order is the order the callback delivers entries (closest ancestor
+        first; the entry itself is not included).
+        """
+        state = self._require_open("object_query_hierarchy")
+        type_code = entry_type_from_name(entry_type)
+        from pb_orca_mcp.orca.dll import PBORCA_HIERPROC
+
+        ancestors: list[str] = []
+
+        def _on_ancestor(p_entry: Any, _user: Any) -> None:
+            ancestors.append(p_entry.contents.lpszAncestorName or "")
+
+        callback = PBORCA_HIERPROC(_on_ancestor)
+        state.callback_refs.append(callback)
+        try:
+            rc = state.api.build.ObjectQueryHierarchy(
+                state.handle, lib_path, entry_name, type_code, callback, None
+            )
+        finally:
+            self._drop_callback(state, callback)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return ancestors
+
+    def object_query_reference(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> list[dict[str, Any]]:
+        """`PBORCA_ObjectQueryReference` — list every entry that references this one."""
+        state = self._require_open("object_query_reference")
+        type_code = entry_type_from_name(entry_type)
+        from pb_orca_mcp.orca.dll import PBORCA_REFPROC
+
+        refs: list[dict[str, Any]] = []
+
+        def _on_ref(p_entry: Any, _user: Any) -> None:
+            r = p_entry.contents
+            refs.append(
+                {
+                    "library": r.lpszLibraryName or "",
+                    "entry_name": r.lpszEntryName or "",
+                    "entry_type": entry_type_to_name(int(r.otEntryType)),
+                    "ref_type": reftype_to_name(int(r.otEntryRefType)),
+                }
+            )
+
+        callback = PBORCA_REFPROC(_on_ref)
+        state.callback_refs.append(callback)
+        try:
+            rc = state.api.build.ObjectQueryReference(
+                state.handle, lib_path, entry_name, type_code, callback, None
+            )
+        finally:
+            self._drop_callback(state, callback)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return refs
+
+    def _make_linkproc(self, state: _State) -> tuple[Any, list[dict[str, Any]]]:
+        """Build a `PBORCA_LNKPROC` that accumulates link errors. Mirrors `_make_errproc`."""
+        from pb_orca_mcp.orca.dll import PBORCA_LNKPROC
+
+        errors: list[dict[str, Any]] = []
+
+        def _on_link_error(p_err: Any, _user: Any) -> None:
+            errors.append({"message_text": p_err.contents.lpszMessageText or ""})
+
+        callback = PBORCA_LNKPROC(_on_link_error)
+        state.callback_refs.append(callback)
+        return callback, errors
 
     def _require_open(self, op: str) -> _State:
         if self._state is None:

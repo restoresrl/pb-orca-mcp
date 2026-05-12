@@ -31,7 +31,15 @@ from ctypes import POINTER, WINFUNCTYPE, c_int, c_long, c_void_p, c_wchar_p
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pb_orca_mcp.orca.types import PBORCA_COMPERR, PBORCA_DIRENTRY, PBORCA_ENTRYINFO
+from pb_orca_mcp.orca.types import (
+    PBORCA_COMPERR,
+    PBORCA_DIRENTRY,
+    PBORCA_ENTRYINFO,
+    PBORCA_EXEINFO,
+    PBORCA_HIERARCHY,
+    PBORCA_LINKERR,
+    PBORCA_REFERENCE,
+)
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
@@ -45,6 +53,18 @@ PBORCA_ERRPROC = WINFUNCTYPE(None, POINTER(PBORCA_COMPERR), c_void_p)
 """ctypes type for `PBORCA_ERRPROC` — the `__stdcall` callback fired by
 the compile/rebuild functions for each diagnostic. Same callback-lifetime
 caveat as `PBORCA_LISTPROC`."""
+
+PBORCA_LNKPROC = WINFUNCTYPE(None, POINTER(PBORCA_LINKERR), c_void_p)
+"""ctypes type for `PBORCA_LNKPROC` — link-error callback fed by
+`PBORCA_ExecutableCreate`."""
+
+PBORCA_HIERPROC = WINFUNCTYPE(None, POINTER(PBORCA_HIERARCHY), c_void_p)
+"""ctypes type for `PBORCA_HIERPROC` — ancestor-chain callback for
+`PBORCA_ObjectQueryHierarchy`."""
+
+PBORCA_REFPROC = WINFUNCTYPE(None, POINTER(PBORCA_REFERENCE), c_void_p)
+"""ctypes type for `PBORCA_REFPROC` — cross-reference callback for
+`PBORCA_ObjectQueryReference`."""
 
 KNOWN_VERSIONS = ("19.0", "22.0", "25.0")
 """PowerBuilder major versions actively tested by v1.
@@ -130,6 +150,28 @@ class CompileFns:
 
 
 @dataclass(frozen=True)
+class BuildFns:
+    """Bound entry points for the ORCA build + object-query group."""
+
+    SetExeInfo: Any
+    """`INT PBORCA_SetExeInfo(HPBORCA, PBORCA_EXEINFO *pExeInfo)`."""
+    ExecutableCreate: Any
+    """`INT PBORCA_ExecutableCreate(HPBORCA, LPTSTR ExeName, LPTSTR IconName,
+    LPTSTR PBRName, PBORCA_LNKPROC, LPVOID, INT *iPBDFlags, INT iNumberOfPBDFlags,
+    LONG lFlags, LPVOID pbcPara)`. The trailing `pbcPara` has a C++ default of NULL
+    in the header — at the FFI level we always pass it explicitly."""
+    DynamicLibraryCreate: Any
+    """`INT PBORCA_DynamicLibraryCreate(HPBORCA, LPTSTR LibName, LPTSTR PBRName,
+    LONG lFlags, LPVOID pbcPara)`."""
+    ObjectQueryHierarchy: Any
+    """`INT PBORCA_ObjectQueryHierarchy(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE, PBORCA_HIERPROC, LPVOID)`."""
+    ObjectQueryReference: Any
+    """`INT PBORCA_ObjectQueryReference(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE, PBORCA_REFPROC, LPVOID)`."""
+
+
+@dataclass(frozen=True)
 class OrcaApi:
     """A loaded `pborc.dll` ready for ORCA calls."""
 
@@ -139,6 +181,7 @@ class OrcaApi:
     session: SessionFns
     library: LibraryFns
     compile: CompileFns
+    build: BuildFns
 
 
 def _python_arch() -> str:
@@ -259,6 +302,41 @@ def _bind_compile_fns(dll: ctypes.WinDLL) -> CompileFns:
     )
 
 
+def _bind_build_fns(dll: ctypes.WinDLL) -> BuildFns:
+    """Apply `argtypes`/`restype` to the build + object-query entry points."""
+    set_exe_info = dll.PBORCA_SetExeInfo
+    set_exe_info.argtypes = [c_void_p, POINTER(PBORCA_EXEINFO)]
+    set_exe_info.restype = c_int
+
+    exe_create = dll.PBORCA_ExecutableCreate
+    exe_create.argtypes = [
+        c_void_p, c_wchar_p, c_wchar_p, c_wchar_p,
+        PBORCA_LNKPROC, c_void_p,
+        POINTER(c_int), c_int, c_long, c_void_p,
+    ]
+    exe_create.restype = c_int
+
+    pbd_create = dll.PBORCA_DynamicLibraryCreate
+    pbd_create.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_long, c_void_p]
+    pbd_create.restype = c_int
+
+    hier_query = dll.PBORCA_ObjectQueryHierarchy
+    hier_query.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int, PBORCA_HIERPROC, c_void_p]
+    hier_query.restype = c_int
+
+    ref_query = dll.PBORCA_ObjectQueryReference
+    ref_query.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int, PBORCA_REFPROC, c_void_p]
+    ref_query.restype = c_int
+
+    return BuildFns(
+        SetExeInfo=set_exe_info,
+        ExecutableCreate=exe_create,
+        DynamicLibraryCreate=pbd_create,
+        ObjectQueryHierarchy=hier_query,
+        ObjectQueryReference=ref_query,
+    )
+
+
 def load_orca(install: PbInstall) -> OrcaApi:
     """Load `pborc.dll` from `install.orca_dll` and bind ORCA prototypes.
 
@@ -283,6 +361,7 @@ def load_orca(install: PbInstall) -> OrcaApi:
         session = _bind_session_fns(dll)
         library = _bind_library_fns(dll)
         compile_ = _bind_compile_fns(dll)
+        build = _bind_build_fns(dll)
     except AttributeError as exc:
         raise OrcaLoadError(
             f"{install.orca_dll}: missing required ORCA entry point ({exc})"
@@ -294,4 +373,5 @@ def load_orca(install: PbInstall) -> OrcaApi:
         session=session,
         library=library,
         compile=compile_,
+        build=build,
     )
