@@ -1,19 +1,276 @@
 # Recipes
 
-> **Status**: phase 1 scaffolding — recipes arrive in phase 7.
+End-to-end agentic workflows that combine multiple `pb_*` tools. Each
+recipe shows the JSON tool-call sequence with notes on why each step is
+required. These are the patterns Claude Code will follow when given a
+high-level task like "fix the compile error in `n_cst_main`".
 
-End-to-end agentic workflows that combine multiple `pb_*` tools.
+The bootstrap of every session is the same:
 
-## Planned recipes
+```jsonc
+// 1. Pick the PB install
+{"tool": "pb_session_open", "args": {"pb_version": "22.0"}}
 
-- **Compile-test loop** — export entry, modify source, re-import + compile, surface errors to the agent.
-- **Cross-PBL rebuild** — set target, run `pb_application_rebuild`, read compile errors.
-- **Build a PBD from a PBL** — for snapshot-style dependency distribution (vendoring compiled `.pbd` artifacts into consumers).
-- **Hierarchy walk** — given a user object, find every ancestor up to `nonvisualobject` / `window`.
-- **Reference audit** — given a function, list every object that calls it.
+// 2. Set the library list — required before set_current_application
+{"tool": "pb_set_library_list", "args": {
+  "libraries": [
+    "C:\\proj\\myapp.pbl",
+    "C:\\proj\\dep\\rstpb_core.pbl"
+  ]
+}}
 
-## Anti-recipe: do NOT replace your build pipeline
+// 3. Pick the application object
+{"tool": "pb_set_current_application", "args": {
+  "app_lib": "C:\\proj\\myapp.pbl",
+  "app_name": "myapp"
+}}
 
-If you already have a working batch build (PowerGen, OrcaScript, or custom),
-keep it. `pb-orca-mcp` is an interactive development tool for agents, not a
-release build runner. Use it for the inner loop, not for tagged releases.
+// At the end of the session
+{"tool": "pb_session_close"}
+```
+
+Each subsequent recipe assumes that bootstrap is already done.
+
+---
+
+## Recipe 1 — Compile-test loop
+
+The inner loop of agentic PB development: an entry is broken, the agent
+edits the source, re-imports it, reads the compile errors, and iterates.
+
+```jsonc
+// Step 1: read the current source
+{"tool": "pb_library_entry_export", "args": {
+  "lib_path": "C:\\proj\\myapp.pbl",
+  "entry_name": "f_compute_total",
+  "entry_type": "function"
+}}
+// → {"source": "$PBExportHeader$f_compute_total.srf\n..."}
+
+// Step 2: the agent edits `source` (outside MCP) to fix a bug
+
+// Step 3: re-import the edited source
+{"tool": "pb_compile_entry_import", "args": {
+  "lib_path": "C:\\proj\\myapp.pbl",
+  "entry_name": "f_compute_total",
+  "entry_type": "function",
+  "syntax": "<edited source text>",
+  "comments": "fixed null-dereference in line 142"
+}}
+
+// → {"success": true, "errors": []}                  // happy path
+// → {"success": false, "errors": [                   // diagnostics path
+//      {"level": 0, "level_name": "error",
+//       "message_number": "C0042",
+//       "message_text": "Undefined function: getfoo",
+//       "column": 8, "line": 142}
+//    ]}
+```
+
+When `success: false`, the `errors` array carries the same diagnostics the
+PB IDE would show — line/column included. The agent can correlate
+`message_text` and `line` with the source it just submitted and iterate.
+
+---
+
+## Recipe 2 — Batch import a set of entries
+
+Faster than calling `pb_compile_entry_import` in a loop: ORCA compiles the
+whole list as one batch, reusing parser state where possible.
+
+```jsonc
+{"tool": "pb_compile_entry_import_list", "args": {
+  "items": [
+    {
+      "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+      "entry_name": "f_split",
+      "entry_type": "function",
+      "syntax": "<edited source>"
+    },
+    {
+      "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+      "entry_name": "f_join",
+      "entry_type": "function",
+      "syntax": "<edited source>"
+    }
+  ]
+}}
+```
+
+All diagnostics from the batch land in the single `errors` array. To pin
+which error belongs to which entry, read the `message_text` — ORCA prefixes
+it with the object name in the form `"<entry>:<text>"`.
+
+---
+
+## Recipe 3 — Full application rebuild after a wide refactor
+
+When edits cross many entries, rebuild the whole application in one
+ORCA call instead of importing entry-by-entry:
+
+```jsonc
+{"tool": "pb_application_rebuild", "args": {"rebuild_type": "full"}}
+```
+
+`rebuild_type`:
+
+- `"incremental"` (default): rebuild only what changed since last compile;
+- `"full"`: re-compile every entry in the library list;
+- `"migrate"`: ORCA's "migrate from older PB version" pass;
+- `"3pass"`: ATL-style 3-pass rebuild (slowest, most thorough).
+
+The response shape matches the compile tools: `{"success", "errors": [...]}`.
+
+---
+
+## Recipe 4 — Build a `.exe` for the current application
+
+After the rebuild is clean, produce a runnable executable:
+
+```jsonc
+{"tool": "pb_executable_create", "args": {
+  "exe_name": "C:\\proj\\dist\\myapp.exe",
+  "icon_name": "C:\\proj\\res\\myapp.ico",
+  "pbr_name": "C:\\proj\\res\\myapp.pbr",
+  "flags": ["machine_code", "optimize_speed", "error_context"],
+  "pbd_flags": [
+    ["machine_code", "optimize_speed"],   // first non-app PBL → .pbd
+    ["machine_code"]                       // second non-app PBL → .pbd
+  ],
+  "exe_info": {
+    "company_name": "Restore srl",
+    "product_name": "MyApp",
+    "file_version": "1.4.2",
+    "file_version_num": "1.4.2.0",
+    "product_version": "1.4.2",
+    "product_version_num": "1.4.2.0",
+    "copyright": "(c) 2026 Restore srl"
+  }
+}}
+```
+
+Returns `{"success", "exe_name", "errors": [...]}`. Link errors (unresolved
+externals, duplicate definitions) land in `errors` with just `message_text`
+— `PBORCA_LNKPROC` is intentionally less rich than `PBORCA_ERRPROC` (no
+line/column for the linker).
+
+For a quick "validate the build" run without all the dressing:
+
+```jsonc
+{"tool": "pb_executable_create", "args": {
+  "exe_name": "C:\\proj\\dist\\myapp.exe",
+  "flags": ["machine_code"]
+}}
+```
+
+P-code is the default — useful for the inner agentic loop where build time
+matters more than runtime speed.
+
+---
+
+## Recipe 5 — Build a single `.pbd` for vendoring
+
+When a downstream consumer pulls a compiled snapshot of a library (the
+"vendor the `.pbd` into `dep/`" pattern from the Restore Magware stack):
+
+```jsonc
+{"tool": "pb_dynamic_library_create", "args": {
+  "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+  "flags": ["machine_code", "optimize_speed"]
+}}
+// → produces rstpb_core.pbd next to rstpb_core.pbl
+```
+
+---
+
+## Recipe 6 — Hierarchy walk
+
+Given a user object, list every ancestor up to the root PB class
+(`nonvisualobject`, `window`, `userobject`, etc.):
+
+```jsonc
+{"tool": "pb_object_query_hierarchy", "args": {
+  "lib_path": "C:\\proj\\myapp.pbl",
+  "entry_name": "n_cst_payment_processor",
+  "entry_type": "userobject"
+}}
+// → {"ancestors": ["n_cst_payment_base", "n_cst_service_base", "nonvisualobject"]}
+```
+
+Closest ancestor first. Useful before editing: the agent can read the
+ancestors' sources too via `pb_library_entry_export` and understand the
+inherited surface area.
+
+---
+
+## Recipe 7 — "Who calls this?" reference audit
+
+Before deleting or renaming a function, find every entry that references
+it:
+
+```jsonc
+{"tool": "pb_object_query_reference", "args": {
+  "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+  "entry_name": "f_legacy_thing",
+  "entry_type": "function"
+}}
+// → {
+//      "count": 7,
+//      "references": [
+//        {"library": "C:\\proj\\myapp.pbl",
+//         "entry_name": "w_main",
+//         "entry_type": "window",
+//         "ref_type": "simple"},
+//        ...
+//      ]
+//    }
+```
+
+`ref_type` is `"simple"` (declarative reference: function call, type
+declaration) or `"open"` (runtime `OpenWithParm` / `Open` of a window).
+
+---
+
+## Recipe 8 — Regenerate a single object after touching its ancestor
+
+When you've edited an ancestor and want to re-emit its descendant's
+machine code without changing the source:
+
+```jsonc
+{"tool": "pb_object_regenerate", "args": {
+  "lib_path": "C:\\proj\\myapp.pbl",
+  "entry_name": "n_cst_payment_processor",
+  "entry_type": "userobject"
+}}
+```
+
+Cheaper than a full `pb_application_rebuild` when you know exactly which
+descendant needs re-emitting.
+
+---
+
+## Anti-recipe — do NOT replace your batch build pipeline
+
+If you already have a working batch build (PowerGen, OrcaScript, custom
+`build.bat`), keep it. `pb-orca-mcp` is an interactive development tool
+for an agent's inner loop, not a tagged-release build runner. Reasons:
+
+- The MCP server runs in the same process as Claude Code; an unhandled
+  crash takes the whole agent down. CI servers want process isolation,
+  retry logic, and structured logs that this server doesn't ship.
+- The library list is configured per-session in memory; a release build
+  needs reproducible config files, not in-memory state.
+- ORCA is single-session-per-process; CI jobs that need parallel builds
+  hit that wall immediately.
+
+Use this for editing. Keep PowerGen/OrcaScript for releases.
+
+---
+
+## Anti-recipe — do NOT touch PBLs that PB IDE has open
+
+If the PowerBuilder IDE is open on the same PBL, ORCA writes fail with
+`PBORCA_LIBIOERROR`. ORCA respects the PB IDE's file locks but doesn't
+queue around them. Close the IDE (or work on a copy) before any
+`pb_library_*` or `pb_compile_*` call that would write to a PBL the IDE
+is editing.

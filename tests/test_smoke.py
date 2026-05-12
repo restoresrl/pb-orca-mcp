@@ -34,13 +34,34 @@ def test_cli_version() -> None:
     assert "pb-orca-mcp" in result.output
 
 
-def test_cli_doctor_stub_exits_nonzero() -> None:
-    """Phase 1 stub: doctor is not implemented yet, exits 2."""
+def test_cli_doctor_runs_to_completion() -> None:
+    """`doctor` enumerates PB installs and exits cleanly.
+
+    Exit code is 0 if at least one arch-compatible IDE was loaded, else 1.
+    On CI without PB or on x64 Python with only x86 installs, expect 1 —
+    either way `doctor` must not crash and must emit version/arch info.
+    """
     from pb_orca_mcp.__main__ import cli
 
     runner = CliRunner()
     result = runner.invoke(cli, ["doctor"])
-    assert result.exit_code == 2
+    assert result.exit_code in (0, 1)
+    assert "pb-orca-mcp" in result.output
+    assert "Python:" in result.output
+
+
+def test_server_exposes_23_tools() -> None:
+    """Every PLAN tool is wired through to the MCP server."""
+    from pb_orca_mcp.server import tool_names
+
+    names = tool_names()
+    assert len(names) == 23
+    # Anchor a few names so a rename or accidental drop fails loudly.
+    assert "pb_discover_pb_install" in names
+    assert "pb_compile_entry_import" in names
+    assert "pb_application_rebuild" in names
+    assert "pb_executable_create" in names
+    assert "pb_object_query_hierarchy" in names
 
 
 def test_discovery_is_importable_and_returns_tuple() -> None:
