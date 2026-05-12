@@ -27,12 +27,19 @@ from __future__ import annotations
 import ctypes
 import struct
 import sys
-from ctypes import POINTER, c_int, c_void_p, c_wchar_p
+from ctypes import POINTER, WINFUNCTYPE, c_int, c_long, c_void_p, c_wchar_p
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pb_orca_mcp.orca.types import PBORCA_DIRENTRY, PBORCA_ENTRYINFO
+
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
+
+PBORCA_LISTPROC = WINFUNCTYPE(None, POINTER(PBORCA_DIRENTRY), c_void_p)
+"""ctypes type for `PBORCA_LISTPROC` — the `__stdcall` callback used by
+`PBORCA_LibraryDirectory`. Instances of this type must outlive the call;
+the Session stores them in `_callback_refs`."""
 
 KNOWN_VERSIONS = ("19.0", "22.0", "25.0")
 """PowerBuilder major versions actively tested by v1.
@@ -73,6 +80,32 @@ class SessionFns:
 
 
 @dataclass(frozen=True)
+class LibraryFns:
+    """Bound entry points for the ORCA library-management group."""
+
+    LibraryCreate: Any
+    """`INT PBORCA_LibraryCreate(HPBORCA, LPTSTR LibName, LPTSTR LibComments)`."""
+    LibraryDelete: Any
+    """`INT PBORCA_LibraryDelete(HPBORCA, LPTSTR LibName)`."""
+    LibraryDirectory: Any
+    """`INT PBORCA_LibraryDirectory(HPBORCA, LPTSTR LibName, LPTSTR LibComments,
+    INT CmntsBuffLen, PBORCA_LISTPROC ListProc, LPVOID UserData)`."""
+    LibraryEntryInformation: Any
+    """`INT PBORCA_LibraryEntryInformation(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE EntryType, PBORCA_ENTRYINFO *pEntryInfo)`."""
+    LibraryEntryExportEx: Any
+    """`INT PBORCA_LibraryEntryExportEx(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE, LPTSTR Buffer, LONG BufferSize, LONG *pReturnSize)`."""
+    LibraryEntryDelete: Any
+    """`INT PBORCA_LibraryEntryDelete(HPBORCA, LPTSTR LibName, LPTSTR EntryName, PBORCA_TYPE)`."""
+    LibraryEntryMove: Any
+    """`INT PBORCA_LibraryEntryMove(HPBORCA, LPTSTR SourceLib, LPTSTR DestLib,
+    LPTSTR EntryName, PBORCA_TYPE)`."""
+    LibraryCommentModify: Any
+    """`INT PBORCA_LibraryCommentModify(HPBORCA, LPTSTR LibName, LPTSTR LibComments)`."""
+
+
+@dataclass(frozen=True)
 class OrcaApi:
     """A loaded `pborc.dll` ready for ORCA calls."""
 
@@ -80,6 +113,7 @@ class OrcaApi:
     dll: ctypes.WinDLL
     tested: bool
     session: SessionFns
+    library: LibraryFns
 
 
 def _python_arch() -> str:
@@ -118,6 +152,54 @@ def _bind_session_fns(dll: ctypes.WinDLL) -> SessionFns:
     )
 
 
+def _bind_library_fns(dll: ctypes.WinDLL) -> LibraryFns:
+    """Apply `argtypes`/`restype` to the library-management entry points."""
+    lib_create = dll.PBORCA_LibraryCreate
+    lib_create.argtypes = [c_void_p, c_wchar_p, c_wchar_p]
+    lib_create.restype = c_int
+
+    lib_delete = dll.PBORCA_LibraryDelete
+    lib_delete.argtypes = [c_void_p, c_wchar_p]
+    lib_delete.restype = c_int
+
+    lib_directory = dll.PBORCA_LibraryDirectory
+    lib_directory.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int, PBORCA_LISTPROC, c_void_p]
+    lib_directory.restype = c_int
+
+    entry_info = dll.PBORCA_LibraryEntryInformation
+    entry_info.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int, POINTER(PBORCA_ENTRYINFO)]
+    entry_info.restype = c_int
+
+    entry_export_ex = dll.PBORCA_LibraryEntryExportEx
+    entry_export_ex.argtypes = [
+        c_void_p, c_wchar_p, c_wchar_p, c_int, c_wchar_p, c_long, POINTER(c_long)
+    ]
+    entry_export_ex.restype = c_int
+
+    entry_delete = dll.PBORCA_LibraryEntryDelete
+    entry_delete.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int]
+    entry_delete.restype = c_int
+
+    entry_move = dll.PBORCA_LibraryEntryMove
+    entry_move.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_wchar_p, c_int]
+    entry_move.restype = c_int
+
+    comment_modify = dll.PBORCA_LibraryCommentModify
+    comment_modify.argtypes = [c_void_p, c_wchar_p, c_wchar_p]
+    comment_modify.restype = c_int
+
+    return LibraryFns(
+        LibraryCreate=lib_create,
+        LibraryDelete=lib_delete,
+        LibraryDirectory=lib_directory,
+        LibraryEntryInformation=entry_info,
+        LibraryEntryExportEx=entry_export_ex,
+        LibraryEntryDelete=entry_delete,
+        LibraryEntryMove=entry_move,
+        LibraryCommentModify=comment_modify,
+    )
+
+
 def load_orca(install: PbInstall) -> OrcaApi:
     """Load `pborc.dll` from `install.orca_dll` and bind ORCA prototypes.
 
@@ -140,13 +222,15 @@ def load_orca(install: PbInstall) -> OrcaApi:
         raise OrcaLoadError(f"Failed to load {install.orca_dll}: {exc}") from exc
     try:
         session = _bind_session_fns(dll)
+        library = _bind_library_fns(dll)
     except AttributeError as exc:
         raise OrcaLoadError(
-            f"{install.orca_dll}: missing required ORCA session entry point ({exc})"
+            f"{install.orca_dll}: missing required ORCA entry point ({exc})"
         ) from exc
     return OrcaApi(
         install=install,
         dll=dll,
         tested=install.version in KNOWN_VERSIONS,
         session=session,
+        library=library,
     )

@@ -17,25 +17,50 @@ State machine:
 treats LibList configuration as orthogonal-but-prerequisite to compile/
 rebuild; we don't enforce a stricter contract than the C API does.
 
-Callback references (`_callback_refs`) are tracked here even though
-phase 3 doesn't register any — phase 5 (compile loop) will append into
-this list and clear it on `close()`. The list lives on the Session
-because callbacks captured during a compile call must outlive the call.
+Callback references (`_callback_refs`) keep Python `WINFUNCTYPE` instances
+alive for the duration of an ORCA call. Without this, Python's GC can
+collect the closure between when ORCA receives the function pointer and
+when it invokes it, leading to a hard crash. The list is cleared on
+`close()` and on each call site that scopes its callback locally.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ctypes
+from ctypes import c_long, pointer
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from pb_orca_mcp.orca.constants import PBORCA_MSGBUFFER, PBORCA_OK
+from pb_orca_mcp.orca.constants import (
+    PBORCA_BUFFERTOOSMALL,
+    PBORCA_MSGBUFFER,
+    PBORCA_OK,
+    entry_type_from_name,
+    entry_type_to_name,
+)
 from pb_orca_mcp.orca.errors import OrcaError
+from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
     from pb_orca_mcp.orca.dll import OrcaApi
+
+
+PBORCA_MAXCOMMENT_BUFSZ = 256
+"""Comment buffer size for `LibraryDirectory` and friends (= PBORCA_MAXCOMMENT + 1)."""
+
+_INITIAL_EXPORT_BUFFER = 64 * 1024
+"""Starting buffer size (in wchars) for `library_entry_export`. Most PB objects fit."""
+
+_MAX_EXPORT_ATTEMPTS = 3
+"""Upper bound on grow-and-retry rounds for `library_entry_export`."""
+
+
+def _strip_buffer(buf: Any) -> str:
+    """Return the leading NUL-terminated portion of a fixed-size `c_wchar` array as a str."""
+    return str(buf).rstrip("\x00") if not isinstance(buf, str) else buf.rstrip("\x00")
 
 
 class SessionStateError(RuntimeError):
@@ -161,6 +186,135 @@ class Session:
         buf = ctypes.create_unicode_buffer(PBORCA_MSGBUFFER)
         state.api.session.SessionGetError(state.handle, buf, PBORCA_MSGBUFFER)
         return buf.value
+
+    # --------------------------- library group ---------------------------
+
+    def library_create(self, lib_path: str, comments: str = "") -> None:
+        """`PBORCA_LibraryCreate(handle, lib, comments)`."""
+        state = self._require_open("library_create")
+        rc = state.api.library.LibraryCreate(state.handle, lib_path, comments)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def library_delete(self, lib_path: str) -> None:
+        """`PBORCA_LibraryDelete(handle, lib)`."""
+        state = self._require_open("library_delete")
+        rc = state.api.library.LibraryDelete(state.handle, lib_path)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def library_comment_modify(self, lib_path: str, comments: str) -> None:
+        """`PBORCA_LibraryCommentModify(handle, lib, comments)`."""
+        state = self._require_open("library_comment_modify")
+        rc = state.api.library.LibraryCommentModify(state.handle, lib_path, comments)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def library_directory(self, lib_path: str) -> tuple[str, list[dict[str, Any]]]:
+        """`PBORCA_LibraryDirectory(handle, lib, libCommentsBuf, len, listProc, NULL)`.
+
+        Returns `(library_comment, entries)` where entries is the list of
+        every object the callback received, normalized to dicts with
+        `name`, `type` (string), `size`, `create_time`, `comment`.
+        """
+        state = self._require_open("library_directory")
+        from pb_orca_mcp.orca.dll import PBORCA_LISTPROC  # avoid cycle at import time
+
+        entries: list[dict[str, Any]] = []
+
+        def _on_entry(p_entry: Any, _user: Any) -> None:
+            e = p_entry.contents
+            entries.append(
+                {
+                    "name": e.lpszEntryName or "",
+                    "type": entry_type_to_name(int(e.otEntryType)),
+                    "size": int(e.lEntrySize),
+                    "create_time": int(e.lCreateTime),
+                    "comment": _strip_buffer(e.szComments),
+                }
+            )
+
+        callback = PBORCA_LISTPROC(_on_entry)
+        state.callback_refs.append(callback)
+        comment_buf = ctypes.create_unicode_buffer(PBORCA_MAXCOMMENT_BUFSZ)
+        try:
+            rc = state.api.library.LibraryDirectory(
+                state.handle, lib_path, comment_buf, PBORCA_MAXCOMMENT_BUFSZ, callback, None
+            )
+        finally:
+            with contextlib.suppress(ValueError):
+                state.callback_refs.remove(callback)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return comment_buf.value, entries
+
+    def library_entry_information(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> dict[str, Any]:
+        """`PBORCA_LibraryEntryInformation(handle, lib, entry, type, &info)`."""
+        state = self._require_open("library_entry_information")
+        type_code = entry_type_from_name(entry_type)
+        info = PBORCA_ENTRYINFO()
+        rc = state.api.library.LibraryEntryInformation(
+            state.handle, lib_path, entry_name, type_code, pointer(info)
+        )
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return {
+            "name": entry_name,
+            "type": entry_type,
+            "object_size": int(info.lObjectSize),
+            "source_size": int(info.lSourceSize),
+            "create_time": int(info.lCreateTime),
+            "comment": _strip_buffer(info.szComments),
+        }
+
+    def library_entry_export(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> str:
+        """`PBORCA_LibraryEntryExportEx` with auto-resizing buffer.
+
+        Starts at 64 KiB; if ORCA returns `PBORCA_BUFFERTOOSMALL`, reads the
+        required size from `pReturnSize` and retries (max 3 attempts).
+        """
+        state = self._require_open("library_entry_export")
+        type_code = entry_type_from_name(entry_type)
+        size = _INITIAL_EXPORT_BUFFER
+        for _ in range(_MAX_EXPORT_ATTEMPTS):
+            buf = ctypes.create_unicode_buffer(size)
+            return_size = c_long(0)
+            rc = state.api.library.LibraryEntryExportEx(
+                state.handle, lib_path, entry_name, type_code, buf, size, pointer(return_size)
+            )
+            if rc == PBORCA_OK:
+                return buf.value
+            if rc == PBORCA_BUFFERTOOSMALL and return_size.value > size:
+                size = return_size.value + 1
+                continue
+            raise self._build_error(rc)
+        raise self._build_error(PBORCA_BUFFERTOOSMALL)
+
+    def library_entry_delete(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> None:
+        """`PBORCA_LibraryEntryDelete(handle, lib, entry, type)`."""
+        state = self._require_open("library_entry_delete")
+        type_code = entry_type_from_name(entry_type)
+        rc = state.api.library.LibraryEntryDelete(state.handle, lib_path, entry_name, type_code)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def library_entry_move(
+        self, source_lib: str, dest_lib: str, entry_name: str, entry_type: str
+    ) -> None:
+        """`PBORCA_LibraryEntryMove(handle, source_lib, dest_lib, entry, type)`."""
+        state = self._require_open("library_entry_move")
+        type_code = entry_type_from_name(entry_type)
+        rc = state.api.library.LibraryEntryMove(
+            state.handle, source_lib, dest_lib, entry_name, type_code
+        )
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
 
     def _require_open(self, op: str) -> _State:
         if self._state is None:

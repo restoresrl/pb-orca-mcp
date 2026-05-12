@@ -102,8 +102,7 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | `pb_library_entry_export` | `PBORCA_LibraryEntryExport` | Estrae source dell'oggetto |
 | `pb_library_entry_delete` | `PBORCA_LibraryEntryDelete` | |
 | `pb_library_entry_move` | `PBORCA_LibraryEntryMove` | Sposta tra PBL |
-| `pb_library_comment_modify` | `PBORCA_LibraryCommentModify` | |
-| `pb_library_entry_comment_modify` | `PBORCA_LibraryEntryCommentModify` | |
+| `pb_library_comment_modify` | `PBORCA_LibraryCommentModify` | Modifica il commento della PBL stessa |
 | `pb_compile_entry_import` | `PBORCA_CompileEntryImport` | Singola entry da source file |
 | `pb_compile_entry_import_list` | `PBORCA_CompileEntryImportList` | Batch import + compile |
 | `pb_application_rebuild` | `PBORCA_ApplicationRebuild` | Full/incremental/migrate (sostituisce `BuildProject*` deprecati in R3) |
@@ -117,6 +116,10 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 Tool **non** esposti in v1 (esistono in ORCA ma valore marginale per agente):
 - `PBORCA_Scc*` (source control connector) — la maggior parte degli utenti PB moderni usa git, non MSSCCI.
 - `PBORCA_BuildProject` / `BuildProjectEx` / `BuildProjectWithOverrides` — **deprecati in R3**, usiamo `ApplicationRebuild`.
+- `PBORCA_LibraryEntryCopy` — semantica "copia entry tra PBL" sovrapposta a `Move`+`Export`+`CompileEntryImport`. Disponibile in ORCA, non esposto in v1.
+
+Funzioni che il PLAN originale citava ma **non esistono in ORCA** (verificato su `PBORCA.H` PB 19/22/25):
+- `PBORCA_LibraryEntryCommentModify` — non esiste. ORCA ha solo `PBORCA_LibraryCommentModify` per modificare il commento della PBL stessa, non delle singole entry. Il commento di un'entry si modifica re-importandola con `CompileEntryImport` + nuovo `lpszComments`.
 
 ### Schema input/output dei tool (pattern)
 

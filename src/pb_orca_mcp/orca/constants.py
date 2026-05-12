@@ -87,3 +87,52 @@ PBORCA_MSGBUFFER = 256
 
 PBORCA_MAXCOMMENT = 255
 """Max library/entry comment length (from `PBORCA.H`). Used by library tools (phase 4)."""
+
+# ORCA entry types (`enum pborca_type` in PBORCA.H). Order matters: values are
+# implicit-incrementing C enum integers starting at 0.
+PBORCA_APPLICATION = 0
+PBORCA_DATAWINDOW = 1
+PBORCA_FUNCTION = 2
+PBORCA_MENU = 3
+PBORCA_QUERY = 4
+PBORCA_STRUCTURE = 5
+PBORCA_USEROBJECT = 6
+PBORCA_WINDOW = 7
+PBORCA_PIPELINE = 8
+PBORCA_PROJECT = 9
+PBORCA_PROXYOBJECT = 10
+PBORCA_BINARY = 11
+
+ENTRY_TYPE_NAMES: dict[int, str] = {
+    PBORCA_APPLICATION: "application",
+    PBORCA_DATAWINDOW: "datawindow",
+    PBORCA_FUNCTION: "function",
+    PBORCA_MENU: "menu",
+    PBORCA_QUERY: "query",
+    PBORCA_STRUCTURE: "structure",
+    PBORCA_USEROBJECT: "userobject",
+    PBORCA_WINDOW: "window",
+    PBORCA_PIPELINE: "pipeline",
+    PBORCA_PROJECT: "project",
+    PBORCA_PROXYOBJECT: "proxyobject",
+    PBORCA_BINARY: "binary",
+}
+
+ENTRY_TYPE_VALUES: dict[str, int] = {name: value for value, name in ENTRY_TYPE_NAMES.items()}
+
+
+def entry_type_to_name(value: int) -> str:
+    """Resolve a `PBORCA_TYPE` int to its string name, falling back to `unknown(N)`."""
+    return ENTRY_TYPE_NAMES.get(value, f"unknown({value})")
+
+
+def entry_type_from_name(name: str) -> int:
+    """Resolve a string entry type name to its `PBORCA_TYPE` int.
+
+    Raises `ValueError` for unknown names (call sites validate caller input).
+    """
+    try:
+        return ENTRY_TYPE_VALUES[name.lower()]
+    except KeyError as exc:
+        valid = ", ".join(sorted(ENTRY_TYPE_VALUES))
+        raise ValueError(f"unknown entry type {name!r}; valid: {valid}") from exc
