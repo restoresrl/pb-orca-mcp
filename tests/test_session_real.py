@@ -95,3 +95,56 @@ def test_library_full_lifecycle(tmp_path: Path) -> None:
         assert not (tmp_path / "tiny.pbl").is_file()
     finally:
         session.close()
+
+
+_BROKEN_FUNCTION_SRC = """\
+$PBExportHeader$f_broken.srf
+global type f_broken from function_object
+end type
+
+forward prototypes
+global function string f_broken (string a)
+end prototypes
+
+global function string f_broken (string a);
+this is intentionally not pb code
+end function
+"""
+
+
+@pytest.mark.requires_pb
+def test_compile_entry_import_returns_structured_response(tmp_path: Path) -> None:
+    """Exercise the compile callback path on real ORCA.
+
+    Imports a syntactically broken global function. The wrapper must return
+    `(success=False, errors=...)` rather than raising; populated `errors`
+    confirms the `PBORCA_ERRPROC` callback fired and was decoded.
+
+    Some setups may short-circuit before parsing (e.g. PBORCA_LIBLISTNOTSET
+    if the LibList wasn't accepted) — in that case `errors` may be empty
+    but `success` must still be False. Either outcome is acceptable here;
+    the test guards the callback infrastructure, not the PB compiler.
+    """
+    loaded = _open_pb22_or_skip()
+    if loaded is None:
+        return
+    _target, api = loaded
+    session = Session.instance()
+    session.open(api)
+    try:
+        pbl = str(tmp_path / "compiletest.pbl")
+        session.library_create(pbl, "compile test")
+        session.set_library_list([pbl])
+
+        success, errors = session.compile_entry_import(
+            pbl, "f_broken", "function", _BROKEN_FUNCTION_SRC, "imported by test"
+        )
+        assert success is False
+        assert isinstance(errors, list)
+        # If ORCA reported diagnostics, they must have line/column ints.
+        for err in errors:
+            assert isinstance(err["line"], int)
+            assert isinstance(err["column"], int)
+            assert isinstance(err["message_text"], str)
+    finally:
+        session.close()

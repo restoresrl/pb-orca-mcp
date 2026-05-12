@@ -136,3 +136,42 @@ def entry_type_from_name(name: str) -> int:
     except KeyError as exc:
         valid = ", ".join(sorted(ENTRY_TYPE_VALUES))
         raise ValueError(f"unknown entry type {name!r}; valid: {valid}") from exc
+
+
+# Rebuild types (`enum pborca_rebuild_type` in PBORCA.H).
+PBORCA_FULL_REBUILD = 0
+PBORCA_INCREMENTAL_REBUILD = 1
+PBORCA_MIGRATE = 2
+PBORCA_3PASS = 3
+
+REBUILD_TYPE_NAMES: dict[int, str] = {
+    PBORCA_FULL_REBUILD: "full",
+    PBORCA_INCREMENTAL_REBUILD: "incremental",
+    PBORCA_MIGRATE: "migrate",
+    PBORCA_3PASS: "3pass",
+}
+
+REBUILD_TYPE_VALUES: dict[str, int] = {name: value for value, name in REBUILD_TYPE_NAMES.items()}
+
+
+def rebuild_type_from_name(name: str) -> int:
+    """Resolve a string rebuild type to its `PBORCA_REBLD_TYPE` int."""
+    try:
+        return REBUILD_TYPE_VALUES[name.lower()]
+    except KeyError as exc:
+        valid = ", ".join(sorted(REBUILD_TYPE_VALUES))
+        raise ValueError(f"unknown rebuild type {name!r}; valid: {valid}") from exc
+
+
+# Compile-error severity (`PBORCA_COMPERR.iLevel`). Not formally specified in
+# the header; this mapping reflects the conventional PB tooling values.
+COMPILE_LEVEL_NAMES: dict[int, str] = {
+    0: "error",
+    1: "warning",
+    2: "information",
+}
+
+
+def compile_level_to_name(level: int) -> str:
+    """Map a `PBORCA_COMPERR.iLevel` int to a string severity, falling back to `unknown(N)`."""
+    return COMPILE_LEVEL_NAMES.get(level, f"unknown({level})")

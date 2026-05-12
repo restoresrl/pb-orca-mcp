@@ -35,10 +35,14 @@ from typing import TYPE_CHECKING, Any
 
 from pb_orca_mcp.orca.constants import (
     PBORCA_BUFFERTOOSMALL,
+    PBORCA_COMPERROR,
+    PBORCA_LINKERROR,
     PBORCA_MSGBUFFER,
     PBORCA_OK,
+    compile_level_to_name,
     entry_type_from_name,
     entry_type_to_name,
+    rebuild_type_from_name,
 )
 from pb_orca_mcp.orca.errors import OrcaError
 from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO
@@ -77,6 +81,8 @@ class _State:
     current_app_name: str | None = None
     library_list: tuple[str, ...] | None = None
     callback_refs: list[Any] = field(default_factory=list)
+    last_compile_errors: list[dict[str, Any]] = field(default_factory=list)
+    """Diagnostics from the most recent compile/rebuild call. Replaced on each call."""
 
 
 class Session:
@@ -315,6 +321,157 @@ class Session:
         )
         if rc != PBORCA_OK:
             raise self._build_error(rc)
+
+    # --------------------------- compile group ---------------------------
+
+    @property
+    def last_compile_errors(self) -> list[dict[str, Any]]:
+        """Diagnostics from the most recent compile/rebuild call.
+
+        Returns an empty list when no session is open or no compile has run.
+        """
+        if self._state is None:
+            return []
+        return list(self._state.last_compile_errors)
+
+    def compile_entry_import(
+        self,
+        lib_path: str,
+        entry_name: str,
+        entry_type: str,
+        syntax: str,
+        comments: str = "",
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """`PBORCA_CompileEntryImport(handle, lib, entry, type, comments, syntax, len, cb, NULL)`.
+
+        Returns `(success, errors)` where `success` is `rc == PBORCA_OK`
+        (i.e. no compile errors). On `PBORCA_COMPERROR (-11)` returns
+        `(False, errors)` with the diagnostics from the callback. Other
+        negative codes raise `OrcaError`.
+        """
+        state = self._require_open("compile_entry_import")
+        type_code = entry_type_from_name(entry_type)
+        callback, errors = self._make_errproc(state)
+        try:
+            rc = state.api.compile.CompileEntryImport(
+                state.handle, lib_path, entry_name, type_code, comments,
+                syntax, len(syntax) + 1, callback, None,
+            )
+        finally:
+            self._drop_callback(state, callback)
+        return self._compile_result(state, rc, errors)
+
+    def compile_entry_import_list(
+        self, items: list[dict[str, Any]]
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """`PBORCA_CompileEntryImportList` over a batch of entries.
+
+        Each `items[i]` must have keys: `lib_path`, `entry_name`,
+        `entry_type` (string), `syntax`. Optional: `comments`.
+        """
+        state = self._require_open("compile_entry_import_list")
+        if not items:
+            raise ValueError("items must contain at least one entry")
+        n = len(items)
+        libs = (ctypes.c_wchar_p * n)(*[i["lib_path"] for i in items])
+        names = (ctypes.c_wchar_p * n)(*[i["entry_name"] for i in items])
+        types = (ctypes.c_int * n)(*[entry_type_from_name(i["entry_type"]) for i in items])
+        comments = (ctypes.c_wchar_p * n)(*[i.get("comments", "") for i in items])
+        syntaxes = (ctypes.c_wchar_p * n)(*[i["syntax"] for i in items])
+        sizes = (c_long * n)(*[len(i["syntax"]) + 1 for i in items])
+        callback, errors = self._make_errproc(state)
+        try:
+            rc = state.api.compile.CompileEntryImportList(
+                state.handle, libs, names, types, comments, syntaxes, sizes,
+                n, callback, None,
+            )
+        finally:
+            self._drop_callback(state, callback)
+        return self._compile_result(state, rc, errors)
+
+    def compile_entry_regenerate(
+        self, lib_path: str, entry_name: str, entry_type: str
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """`PBORCA_CompileEntryRegenerate(handle, lib, entry, type, cb, NULL)`."""
+        state = self._require_open("compile_entry_regenerate")
+        type_code = entry_type_from_name(entry_type)
+        callback, errors = self._make_errproc(state)
+        try:
+            rc = state.api.compile.CompileEntryRegenerate(
+                state.handle, lib_path, entry_name, type_code, callback, None
+            )
+        finally:
+            self._drop_callback(state, callback)
+        return self._compile_result(state, rc, errors)
+
+    def application_rebuild(
+        self, rebuild_type: str = "incremental"
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """`PBORCA_ApplicationRebuild(handle, rebld_type, cb, NULL)`.
+
+        `rebuild_type` ∈ `{"full", "incremental", "migrate", "3pass"}`.
+        Requires `set_current_application` + `set_library_list` first.
+        """
+        state = self._require_open("application_rebuild")
+        type_code = rebuild_type_from_name(rebuild_type)
+        callback, errors = self._make_errproc(state)
+        try:
+            rc = state.api.compile.ApplicationRebuild(
+                state.handle, type_code, callback, None
+            )
+        finally:
+            self._drop_callback(state, callback)
+        return self._compile_result(state, rc, errors)
+
+    def _make_errproc(self, state: _State) -> tuple[Any, list[dict[str, Any]]]:
+        """Build a `PBORCA_ERRPROC` that accumulates diagnostics into a fresh list.
+
+        The callback object is registered in `state.callback_refs` and
+        must be removed by the caller via `_drop_callback` after the ORCA
+        call returns (`finally` block).
+        """
+        from pb_orca_mcp.orca.dll import PBORCA_ERRPROC  # avoid import cycle
+
+        errors: list[dict[str, Any]] = []
+
+        def _on_error(p_err: Any, _user: Any) -> None:
+            e = p_err.contents
+            errors.append(
+                {
+                    "level": int(e.iLevel),
+                    "level_name": compile_level_to_name(int(e.iLevel)),
+                    "message_number": e.lpszMessageNumber or "",
+                    "message_text": e.lpszMessageText or "",
+                    "column": int(e.iColumnNumber),
+                    "line": int(e.iLineNumber),
+                }
+            )
+
+        callback = PBORCA_ERRPROC(_on_error)
+        state.callback_refs.append(callback)
+        return callback, errors
+
+    @staticmethod
+    def _drop_callback(state: _State, callback: Any) -> None:
+        with contextlib.suppress(ValueError):
+            state.callback_refs.remove(callback)
+
+    def _compile_result(
+        self, state: _State, rc: int, errors: list[dict[str, Any]]
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """Translate an ORCA compile/rebuild return code to (success, errors).
+
+        - `PBORCA_OK`: success, errors may still contain warnings.
+        - `PBORCA_COMPERROR` / `PBORCA_LINKERROR`: not an exception — the
+          callback already populated the diagnostics; report success=False.
+        - Anything else: raise `OrcaError`.
+        """
+        state.last_compile_errors = list(errors)
+        if rc == PBORCA_OK:
+            return True, errors
+        if rc in (PBORCA_COMPERROR, PBORCA_LINKERROR):
+            return False, errors
+        raise self._build_error(rc)
 
     def _require_open(self, op: str) -> _State:
         if self._state is None:

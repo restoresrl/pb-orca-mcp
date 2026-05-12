@@ -31,7 +31,7 @@ from ctypes import POINTER, WINFUNCTYPE, c_int, c_long, c_void_p, c_wchar_p
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from pb_orca_mcp.orca.types import PBORCA_DIRENTRY, PBORCA_ENTRYINFO
+from pb_orca_mcp.orca.types import PBORCA_COMPERR, PBORCA_DIRENTRY, PBORCA_ENTRYINFO
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
@@ -40,6 +40,11 @@ PBORCA_LISTPROC = WINFUNCTYPE(None, POINTER(PBORCA_DIRENTRY), c_void_p)
 """ctypes type for `PBORCA_LISTPROC` — the `__stdcall` callback used by
 `PBORCA_LibraryDirectory`. Instances of this type must outlive the call;
 the Session stores them in `_callback_refs`."""
+
+PBORCA_ERRPROC = WINFUNCTYPE(None, POINTER(PBORCA_COMPERR), c_void_p)
+"""ctypes type for `PBORCA_ERRPROC` — the `__stdcall` callback fired by
+the compile/rebuild functions for each diagnostic. Same callback-lifetime
+caveat as `PBORCA_LISTPROC`."""
 
 KNOWN_VERSIONS = ("19.0", "22.0", "25.0")
 """PowerBuilder major versions actively tested by v1.
@@ -106,6 +111,25 @@ class LibraryFns:
 
 
 @dataclass(frozen=True)
+class CompileFns:
+    """Bound entry points for the ORCA compile/rebuild group."""
+
+    CompileEntryImport: Any
+    """`INT PBORCA_CompileEntryImport(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE EntryType, LPTSTR Comments, LPTSTR EntrySyntax, LONG SyntaxBuffSize,
+    PBORCA_ERRPROC, LPVOID UserData)`."""
+    CompileEntryImportList: Any
+    """`INT PBORCA_CompileEntryImportList(HPBORCA, LPTSTR* LibNames, LPTSTR* EntryNames,
+    PBORCA_TYPE* EntryTypes, LPTSTR* Comments, LPTSTR* SyntaxBuffers, LONG* SyntaxBuffSizes,
+    INT NumberOfEntries, PBORCA_ERRPROC, LPVOID UserData)`."""
+    CompileEntryRegenerate: Any
+    """`INT PBORCA_CompileEntryRegenerate(HPBORCA, LPTSTR LibName, LPTSTR EntryName,
+    PBORCA_TYPE, PBORCA_ERRPROC, LPVOID)`."""
+    ApplicationRebuild: Any
+    """`INT PBORCA_ApplicationRebuild(HPBORCA, PBORCA_REBLD_TYPE, PBORCA_ERRPROC, LPVOID)`."""
+
+
+@dataclass(frozen=True)
 class OrcaApi:
     """A loaded `pborc.dll` ready for ORCA calls."""
 
@@ -114,6 +138,7 @@ class OrcaApi:
     tested: bool
     session: SessionFns
     library: LibraryFns
+    compile: CompileFns
 
 
 def _python_arch() -> str:
@@ -200,6 +225,40 @@ def _bind_library_fns(dll: ctypes.WinDLL) -> LibraryFns:
     )
 
 
+def _bind_compile_fns(dll: ctypes.WinDLL) -> CompileFns:
+    """Apply `argtypes`/`restype` to the compile/rebuild entry points."""
+    entry_import = dll.PBORCA_CompileEntryImport
+    entry_import.argtypes = [
+        c_void_p, c_wchar_p, c_wchar_p, c_int, c_wchar_p, c_wchar_p, c_long,
+        PBORCA_ERRPROC, c_void_p,
+    ]
+    entry_import.restype = c_int
+
+    entry_import_list = dll.PBORCA_CompileEntryImportList
+    entry_import_list.argtypes = [
+        c_void_p,
+        POINTER(c_wchar_p), POINTER(c_wchar_p), POINTER(c_int),
+        POINTER(c_wchar_p), POINTER(c_wchar_p), POINTER(c_long),
+        c_int, PBORCA_ERRPROC, c_void_p,
+    ]
+    entry_import_list.restype = c_int
+
+    entry_regenerate = dll.PBORCA_CompileEntryRegenerate
+    entry_regenerate.argtypes = [c_void_p, c_wchar_p, c_wchar_p, c_int, PBORCA_ERRPROC, c_void_p]
+    entry_regenerate.restype = c_int
+
+    app_rebuild = dll.PBORCA_ApplicationRebuild
+    app_rebuild.argtypes = [c_void_p, c_int, PBORCA_ERRPROC, c_void_p]
+    app_rebuild.restype = c_int
+
+    return CompileFns(
+        CompileEntryImport=entry_import,
+        CompileEntryImportList=entry_import_list,
+        CompileEntryRegenerate=entry_regenerate,
+        ApplicationRebuild=app_rebuild,
+    )
+
+
 def load_orca(install: PbInstall) -> OrcaApi:
     """Load `pborc.dll` from `install.orca_dll` and bind ORCA prototypes.
 
@@ -223,6 +282,7 @@ def load_orca(install: PbInstall) -> OrcaApi:
     try:
         session = _bind_session_fns(dll)
         library = _bind_library_fns(dll)
+        compile_ = _bind_compile_fns(dll)
     except AttributeError as exc:
         raise OrcaLoadError(
             f"{install.orca_dll}: missing required ORCA entry point ({exc})"
@@ -233,4 +293,5 @@ def load_orca(install: PbInstall) -> OrcaApi:
         tested=install.version in KNOWN_VERSIONS,
         session=session,
         library=library,
+        compile=compile_,
     )

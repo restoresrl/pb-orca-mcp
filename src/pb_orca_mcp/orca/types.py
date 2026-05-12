@@ -9,7 +9,7 @@ every modern release (see [[pborca-h]]).
 
 from __future__ import annotations
 
-from ctypes import Structure, c_int, c_long, c_wchar, c_wchar_p
+from ctypes import Structure, c_int, c_long, c_uint, c_wchar, c_wchar_p
 
 from pb_orca_mcp.orca.constants import PBORCA_MAXCOMMENT
 
@@ -41,4 +41,22 @@ class PBORCA_ENTRYINFO(Structure):
         ("lCreateTime", c_long),
         ("lObjectSize", c_long),
         ("lSourceSize", c_long),
+    ]
+
+
+class PBORCA_COMPERR(Structure):
+    """Callback record for `PBORCA_ERRPROC` (compile/rebuild error reporting).
+
+    `iLevel` semantics aren't formally documented in `PBORCA.H`; observed
+    convention from PB ATL/build tools is `0=error`, `1=warning`,
+    `2=information`. The wrapper exposes the raw int alongside a best-
+    effort name so callers can rely on whichever they trust.
+    """
+
+    _fields_ = [
+        ("iLevel", c_int),
+        ("lpszMessageNumber", c_wchar_p),
+        ("lpszMessageText", c_wchar_p),
+        ("iColumnNumber", c_uint),
+        ("iLineNumber", c_uint),
     ]
