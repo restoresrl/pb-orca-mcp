@@ -1,0 +1,80 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pb-orca-mcp"
+version = "0.0.1"
+description = "MCP server that bridges Claude Code to PowerBuilder via the ORCA API (pborc.dll)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "TBD" }
+authors = [
+    { name = "Carlo Torrese", email = "carlo.torrese@re-store.it" },
+]
+keywords = ["powerbuilder", "orca", "mcp", "claude", "agentic", "pb"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "mcp>=1.0",
+    "pydantic>=2.0",
+    "click>=8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+pb-orca-mcp = "pb_orca_mcp.__main__:cli"
+
+[project.urls]
+Homepage = "https://github.com/carlotorrese/pb-orca-mcp"
+Issues = "https://github.com/carlotorrese/pb-orca-mcp/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pb_orca_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/pb_orca_mcp",
+    "tests",
+    "docs",
+    "README.md",
+    "CLAUDE.md",
+    "pyproject.toml",
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "requires_pb: test requires a real PowerBuilder installation (skipped in CI)",
+    "requires_orca_session: test opens a real ORCA session (single-threaded, serialized)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
