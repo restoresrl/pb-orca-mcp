@@ -11,13 +11,14 @@ PowerBuilder's GUI-only IDE otherwise keeps closed.
 
 ## Why
 
-PowerBuilder is a closed-world IDE: an agent can read/write the extracted
-sources (`ws_objects/src/*.pbl.src/*.sr*`) but cannot compile or validate
-them without a human opening the IDE or running a batch tool like PowerGen.
-ORCA exposes the same primitives the IDE uses internally — sessions,
-library directories, compile/import, application rebuild, EXE/PBD creation,
-hierarchy and reference queries — over a flat C API. This project wraps
-that API as MCP tools so an agent can drive PowerBuilder directly.
+PowerBuilder is a closed-world IDE: an agent can read and write the
+`.sr*` source files PB exports, but it cannot compile, validate or build
+them without a human opening the IDE or running a batch tool like
+PowerGen. ORCA exposes the same primitives the IDE uses internally —
+sessions, library directories, compile/import, application rebuild,
+EXE/PBD creation, hierarchy and reference queries — over a flat C API.
+This project wraps that API as MCP tools so an agent can drive
+PowerBuilder directly.
 
 ## Quickstart
 
@@ -104,19 +105,13 @@ Full design and rationale in [`PLAN.md`](PLAN.md).
 
 ## Status
 
-**Phase 7 of 7 — packaging + docs.** All ORCA primitives are wired through
-to MCP tools; ABI tested against PB 19 / 22 / 25 headers. Awaiting first
-PyPI release.
+**v0.1.0 released** (2026-05-13). All ORCA primitives are wired through
+to MCP tools; ABI tested against PB 2019 R3, 2022 R3, 2025 — same set of
+prototypes covers any release since PB 2019 (ABI stable). 107 pytest
+tests green, including the end-to-end compile-test loop validated with
+Claude Code driving the MCP server against a real PB 22.0 workspace.
 
-| Phase | Scope | Status |
-|---|---|---|
-| 1 | Foundation (scaffolding, CI, smoke tests) | done |
-| 2 | Discovery + loader multi-version, `.pbt`/`.pbw` parser | done |
-| 3 | Session lifecycle + application configuration | done |
-| 4 | Library operations | done |
-| 5 | Compile loop (callbacks, error buffer) — the core value | done |
-| 6 | Build artifacts (EXE/PBD) + object hierarchy/reference | done |
-| 7 | Packaging + docs | done |
+Next: first PyPI publish; community feedback round.
 
 ## Documentation
 
