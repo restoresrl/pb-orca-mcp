@@ -107,6 +107,15 @@ The `.pbl` is canonical. Work in memory.
 - **`pb_compile_entry_import` does not auto-update `ws_objects/`**
   (verified experimentally). On git projects you handle the SOT file
   with your host tools; ORCA's job is the `.pbl`.
+- **Edit tools may flip `.sr*` files from UTF-16 LE BOM to UTF-8 BOM**
+  on save. PB rejects the converted file. After any host-tool edit on
+  a `.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`, reconvert with PowerShell:
+  `[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode)`
+  (the .NET name "Unicode" is UTF-16 LE BOM). First 2 bytes should be
+  `FF FE`. See `docs/workflow.md` "Encoding caveat" for details.
+- **Export/import asymmetry**: `pb_library_entry_export` returns the
+  body only; `pb_compile_entry_import` requires `$PBExportHeader$<name>.<ext>`
+  as the first line of `syntax`. Re-prepend it manually for round-trips.
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically.
   Always check `git status` and revert unless you added a target.
 
@@ -129,8 +138,13 @@ over the manual sync of steps 4–5 of Variant A:
 {"tool": "pb_scc_close", "args": {}}
 ```
 
-`local_proj_path` must be the parent directory of `ws_objects/`. See
-`docs/workflow.md` "Native ORCA SCC sync" for details and limitations.
+`local_proj_path` must be the parent directory of `ws_objects/`.
+`pb_scc_set_target` also configures the session's library list and
+current application — calling `pb_set_library_list` or
+`pb_set_current_application` after it returns `PBORCA_DUPOPERATION (-2)`.
+Skip them in the SCC flow; you can go straight to `pb_application_rebuild`.
+
+See `docs/workflow.md` "Native ORCA SCC sync" for details and limitations.
 Reference:
 <https://docs.appeon.com/pb2025/pbug/usage_notes_2.html>
 

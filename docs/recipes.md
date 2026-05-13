@@ -45,16 +45,25 @@ edits the source, re-imports it, reads the compile errors, and iterates.
   "entry_name": "f_compute_total",
   "entry_type": "function"
 }}
-// → {"source": "$PBExportHeader$f_compute_total.srf\n..."}
+// → {"source": "global type f_compute_total ...\n..."}
+//   NOTE — asymmetry vs Step 3 below: `source` is the **body only**.
+//   The first line is NOT a `$PBExportHeader$` line. The on-disk export
+//   produced by PB IDE *does* start with `$PBExportHeader$<name>.<ext>`,
+//   but `library_entry_export` strips it. See memory pb-source-export-format.
 
 // Step 2: the agent edits `source` (outside MCP) to fix a bug
 
 // Step 3: re-import the edited source
+//   IMPORTANT: `compile_entry_import` REQUIRES the `$PBExportHeader$` line
+//   as the first line of `syntax`. For a direct export→import round-trip
+//   you must re-prepend it manually:
+//     syntax = "$PBExportHeader$f_compute_total.srf\r\n" + edited_source
+//   Without this the import returns an error before reaching the compiler.
 {"tool": "pb_compile_entry_import", "args": {
   "lib_path": "C:\\proj\\myapp.pbl",
   "entry_name": "f_compute_total",
   "entry_type": "function",
-  "syntax": "<edited source text>",
+  "syntax": "$PBExportHeader$f_compute_total.srf\r\n<edited source text>",
   "comments": "fixed null-dereference in line 142"
 }}
 
