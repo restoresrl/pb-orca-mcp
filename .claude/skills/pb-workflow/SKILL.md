@@ -110,22 +110,28 @@ The `.pbl` is canonical. Work in memory.
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically.
   Always check `git status` and revert unless you added a target.
 
-## Future: native sync via ORCA SCC
+## Native sync via ORCA SCC
 
-The ORCA API exposes `scc *` commands that work with git in offline
+The ORCA API exposes `scc *` commands that work with git/svn in offline
 mode and provide the equivalent of "Refresh PBL" (with add / modify /
-delete) in one call:
+delete) in one call. Exposed via `pb_scc_*` MCP tools — prefer them
+over the manual sync of steps 4–5 of Variant A:
 
-```
-scc set connect property localprojpath "<parent of ws_objects>"
-scc connect offline
-scc refresh target incremental
-scc close
+```jsonc
+{"tool": "pb_scc_connect_offline", "args": {
+    "workspace_file":  "<.pbw>",
+    "local_proj_path": "<parent of ws_objects>"
+}}
+{"tool": "pb_scc_set_target", "args": {
+    "target_file": "<.pbt>", "flags": ["refresh_all", "importonly"]
+}}
+{"tool": "pb_scc_refresh_target", "args": {"rebuild_type": "incremental"}}
+{"tool": "pb_scc_close", "args": {}}
 ```
 
-If `pb-orca-mcp` exposes these commands (check the current tool list
-when you open a session), prefer them over the manual sync of steps
-4–5 of Variant A. Reference:
+`local_proj_path` must be the parent directory of `ws_objects/`. See
+`docs/workflow.md` "Native ORCA SCC sync" for details and limitations.
+Reference:
 <https://docs.appeon.com/pb2025/pbug/usage_notes_2.html>
 
 ## Full documentation

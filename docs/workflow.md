@@ -137,22 +137,15 @@ improvements"), the sync has to be orchestrated step by step:
    git commit
    ```
 
-#### Future procedure — when ORCA SCC is wrapped by `pb-orca-mcp`
+#### Short-cut via native ORCA SCC
 
 PowerBuilder's ORCA API includes `scc *` commands that work with git in
 offline mode. They provide the native equivalent of PB IDE's "Refresh
-PBL", including add / modify / delete reconciliation. Once `pb-orca-mcp`
-exposes them, steps 4–5 collapse into:
-
-```
-scc set connect property localprojpath "<dir parent of ws_objects>"
-scc set connect property logfile        "<log path>"
-scc connect offline
-scc refresh target incremental
-scc close
-```
-
-See "Future improvements" below for the current wrapping status.
+PBL", including add / modify / delete reconciliation. Steps 4–5 of the
+manual workflow above collapse into one call sequence via the MCP tools
+`pb_scc_connect_offline` → `pb_scc_set_target` → `pb_scc_refresh_target`
+→ `pb_scc_close`. See the "Native ORCA SCC sync" section below for the
+detail.
 
 ### Variant B — Standalone project (no `ws_objects/`, the `.pbl` is SOT)
 
@@ -226,9 +219,8 @@ Run Refresh PBL after:
 - any external edit of `ws_objects/` (this includes Claude Code with
   external edits, or `git revert`).
 
-From a CLI / non-IDE context there is no direct equivalent today; the
-ORCA `scc refresh target` sequence will replace it once exposed (see
-"Future improvements").
+From a CLI / non-IDE context the native equivalent is the `pb_scc_*`
+tool sequence; see "Native ORCA SCC sync" below.
 
 ## Workspace file (`.pbw`)
 
@@ -253,40 +245,58 @@ observed to be **non-deterministic** — the file is not always touched on
 every call. Always check `git status` after an ORCA session and revert
 the `.pbw` if needed.
 
-## Future improvements
-
-### Wrap ORCA SCC commands in `pb-orca-mcp`
+## Native ORCA SCC sync (offline mode, git/svn)
 
 PowerBuilder's ORCA API exposes a `scc *` family of commands that work
-with git in offline mode (no remote SCC server connection). The
-sequence:
-
-```
-scc set connect property localprojpath "<parent of ws_objects>"
-scc set connect property logfile        "<log path>"
-scc connect offline
-scc refresh target incremental
-scc close
-```
-
-is the native equivalent of "Refresh PBL" in PB IDE: it syncs
+with git/svn in offline mode (no remote SCC server connection). It is
+the native equivalent of "Refresh PBL" in PB IDE: syncs
 `ws_objects/` → `.pbl` including add / modify / delete in a single
-call. Reference: <https://docs.appeon.com/pb2025/pbug/usage_notes_2.html>
+call, collapsing Variant A from 8 manual steps to ~4. Exposed via 6
+MCP tools: `pb_scc_connect_offline`, `pb_scc_set_target`,
+`pb_scc_refresh_target`, `pb_scc_exclude_library_list`,
+`pb_scc_get_connect_properties`, `pb_scc_close`.
+
+Typical call sequence (`local_proj_path` must point to the **parent of
+`ws_objects/`**):
+
+```jsonc
+{"tool": "pb_session_open",        "args": {"pb_version": "22.0"}}
+{"tool": "pb_scc_connect_offline", "args": {
+    "workspace_file":   "C:\\proj\\<project>.pbw",
+    "local_proj_path":  "C:\\proj"
+}}
+{"tool": "pb_scc_set_target", "args": {
+    "target_file": "C:\\proj\\<lib>.pbt",
+    "flags":       ["refresh_all", "importonly"]
+}}
+{"tool": "pb_scc_refresh_target", "args": {"rebuild_type": "incremental"}}
+{"tool": "pb_scc_close",   "args": {}}
+{"tool": "pb_session_close","args": {}}
+```
+
+References: <https://docs.appeon.com/pb2025/pbug/usage_notes_2.html>
+and <https://docs.appeon.com/pb2025/pbug/ug36631.html>.
 
 Known limitations:
 
-- `scc get latest version` and direct connections to an SCC server do
-  not work with git. Use git CLI for those (clone, pull, push).
+- `scc get latest version` and direct connections to a remote SCC
+  server do not work with git/svn — by design. Use git/svn CLI for
+  those (clone, pull, push).
+- `pb_scc_get_connect_properties` always returns `PBORCA_REGREADERROR
+  (-23)` on a git/svn workspace (the `.pbw` has no SCC block);
+  `pb_scc_connect_offline` tolerates it and proceeds. Both are
+  doc-officially expected per Appeon.
 - On the first upload of a workspace to git, objects are generated under
   `ws_objects/` in a flat layout; entries with the same name from
   different `.pbl`s overwrite each other. Workaround: organize the
   project so each `.pbl` has its own `ws_objects/<lib>.pbl.src/`
   subdirectory. PB IDE does this automatically for newly-created
   workspaces.
+- In offline mode only `local_proj_path`, `log_file`, `append_log` take
+  effect; the other config fields are silently ignored by the SCC layer
+  (per `ug36631.html`).
 
-**Wrapping status in `pb-orca-mcp`**: not yet exposed. Adding these
-commands is the single biggest improvement that would simplify Variant A
-of the workflow from 8 manual steps to 4.
+## Future improvements
 
 ### Diagnostic comparison: pbl ↔ ws_objects
 
@@ -353,13 +363,15 @@ Write:
 - `pb_application_rebuild` — full / incremental / migrate / 3pass
   rebuild
 
-SCC (to verify whether exposed by `pb-orca-mcp` MCP):
+SCC (offline mode for git/svn workspaces):
 
-- `scc set connect property …`
-- `scc connect offline`
-- `scc refresh target incremental`
-- `scc exclude liblist …`
-- `scc close`
+- `pb_scc_get_connect_properties` — read SCC block from `.pbw` (returns
+  `-23` on git/svn, expected)
+- `pb_scc_connect_offline` — open offline connection (no remote server)
+- `pb_scc_set_target` — bind a `.pbt` and list affected PBLs
+- `pb_scc_refresh_target` — sync `ws_objects/` → `.pbl` (add/modify/delete)
+- `pb_scc_exclude_library_list` — exclude `.pbd` references from refresh
+- `pb_scc_close` — close the SCC connection (also done by Session.close)
 
 Diagnostics:
 
