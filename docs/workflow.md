@@ -168,6 +168,30 @@ There is no text file to edit on disk; everything happens in memory.
 4. Re-import it: `pb_compile_entry_import` with the modified `syntax`.
 5. Close the session. Only the `.pbl` has changed; commit it alone.
 
+### Editing `.sr*` source files — encoding caveat
+
+PB source files (`.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`) are **UTF-16 LE
+with BOM** (`FF FE`) and **CRLF** line endings. ORCA (and PB IDE itself)
+refuse to parse them in any other encoding.
+
+Most host editors and CLI write tools default to UTF-8 with LF when they
+save text files — so a naïve "edit the `.srw` and refresh" round-trip can
+silently downgrade the file to **UTF-8 BOM** (`EF BB BF`), at which point
+`pb_scc_refresh_target` and `pb_compile_entry_import` fail. After any host
+edit on a `.sr*` file, reconvert before the refresh:
+
+```powershell
+$path = "...\<file>.srw"
+$content = Get-Content -Raw -Path $path -Encoding UTF8
+$content = $content -replace "`r`n","`n" -replace "`n","`r`n"   # normalize to CRLF
+[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode)
+```
+
+`[System.Text.Encoding]::Unicode` in .NET is UTF-16 LE BOM (despite the
+misleading name). After conversion the first 2 bytes should be `FF FE`
+and the file roughly doubles in size. Validated 2026-05-13 on a window
+edit smoke test.
+
 ### Passing large `syntax` strings
 
 `pb_compile_entry_import` accepts `syntax` inline in the tool call. The
@@ -286,6 +310,12 @@ Known limitations:
   (-23)` on a git/svn workspace (the `.pbw` has no SCC block);
   `pb_scc_connect_offline` tolerates it and proceeds. Both are
   doc-officially expected per Appeon.
+- `pb_scc_set_target` **also configures the session's library list and
+  current application** as a side effect — so subsequent calls to
+  `pb_set_library_list` or `pb_set_current_application` return
+  `PBORCA_DUPOPERATION (-2)`. Skip them in the SCC flow. A direct
+  `pb_application_rebuild` call after `scc_set_target` works without
+  any additional setup.
 - On the first upload of a workspace to git, objects are generated under
   `ws_objects/` in a flat layout; entries with the same name from
   different `.pbl`s overwrite each other. Workaround: organize the
