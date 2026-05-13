@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "pb-orca-mcp",
+  "version": "0.1.0",
+  "description": "PowerBuilder object editing and build automation through the ORCA API. Bundles the pb-orca MCP server with a workflow skill that covers the source-of-truth model (ws_objects/ on git projects, .pbl on standalone) and the .pbl ↔ ws_objects/ propagation rules.",
+  "keywords": ["powerbuilder", "pb", "orca", "pbl", "ws_objects", "appeon"],
+
+  "_TODO_marketplace_distribution": [
+    "Step B (future session): register this plugin in a marketplace.",
+    "Options for the marketplace manifest:",
+    "  - GitHub mirror of this repo with .claude-plugin/marketplace.json at the root,",
+    "  - dedicated marketplace repo (e.g. github.com/<org>/claude-plugins),",
+    "  - local directory marketplace for development (file://...).",
+    "After publication, register on the user side via extraKnownMarketplaces in ~/.claude/settings.json,",
+    "then install with the /plugin command. At that point the user-level copy at",
+    "~/.claude/skills/pb-workflow/SKILL.md can be removed; the canonical skill source becomes",
+    "this repo's .claude/skills/pb-workflow/SKILL.md."
+  ]
+}
