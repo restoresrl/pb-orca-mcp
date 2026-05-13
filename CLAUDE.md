@@ -59,6 +59,21 @@ vedi "Cose da tenere a mente" sotto). Licenza già scelta: MIT
   runtime**, quindi una modifica al codice in `src/` richiede **riavvio
   di Claude Code** per essere testabile via tool MCP. I pytest invece
   vedono le modifiche immediatamente (editable install).
+- **Restart strategy — resume prima, handoff come fallback**: il restart
+  MCP fa perdere il contesto conversazionale se la nuova sessione parte
+  fresca. Soluzione **preferita**: Carlo lancia `claude --resume` (o
+  `claude -c` per continue last) dopo il restart → il transcript JSONL
+  viene ricaricato → tutto il ragionamento è preservato, niente da
+  salvare. Quando suggerisco un restart, suggerisco anche `--resume`.
+  Soluzione **fallback** (handoff memory): vale solo quando il resume
+  non è praticabile — conversazione molto lunga e context vicino al
+  limite, sessione "sporca" che si vuole scartare, sessioni separate
+  da giorni. In quei casi salvo `memory/handoff_<topic>.md` con:
+  (1) modifiche uncommitted (file + 1 riga), (2) stato test, (3) passi
+  di validazione con comandi e outcome attesi, (4) decisioni aperte,
+  (5) anti-redo notes. Linko l'handoff in `MEMORY.md` con marker
+  **HANDOFF** e lo cancello a validazione confermata. Vedi
+  [[save-operational-plans-before-restart]] per il razionale.
 - **Pre-commit hygiene** (manuale): ruff + mypy + pytest verdi prima del
   commit. Per i commit destinati al repo pubblico, vale anche la grep
   della memory `public-repo-hygiene` (no riferimenti Restore-internal,
