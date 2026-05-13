@@ -112,6 +112,8 @@ class _FakeApi:
     library: Any = None
     compile: Any = None
     build: _FakeBuild = field(default_factory=_FakeBuild)
+    dll_search_handles: tuple[Any, ...] = ()
+    original_path: str = ""
 
 
 @pytest.fixture

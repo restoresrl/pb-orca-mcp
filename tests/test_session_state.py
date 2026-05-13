@@ -55,6 +55,8 @@ class _FakeInstall:
 class _FakeApi:
     install: _FakeInstall = field(default_factory=_FakeInstall)
     session: _FakeSessionFns = field(default_factory=_FakeSessionFns)
+    dll_search_handles: tuple[Any, ...] = ()
+    original_path: str = ""
 
 
 @pytest.fixture

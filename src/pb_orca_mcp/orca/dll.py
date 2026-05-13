@@ -226,6 +226,21 @@ class OrcaApi:
     compile: CompileFns
     build: BuildFns
     scc: SccFns
+    dll_search_handles: tuple[Any, ...] = ()
+    """`_AddedDllDirectory` handles kept alive for the lifetime of the loaded
+    DLL. Needed for `pborc.dll`'s static imports (pbvm/pbshr/…) which
+    `ctypes.WinDLL` resolves with `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS` (Python
+    3.8+ default), a flag that honours user-defined dirs. Owned by the
+    `Session` and released in `Session.close()`."""
+    original_path: str = ""
+    """Snapshot of `os.environ["PATH"]` before the loader prepended PB IDE
+    dirs. `pborc.dll` lazily loads some dependents (e.g. `pblib.dll` during
+    `SccConnectOffline`) via a plain `LoadLibraryW` whose default flags
+    follow the Standard DLL Search Order — which does **not** consult
+    user-defined dirs added via `AddDllDirectory`, but **does** consult
+    `PATH`. Without the prepend the lazy load fails with
+    `PBORCA_BADLIBRARY (-4)`. Restored to `os.environ["PATH"]` in
+    `Session.close()`."""
 
 
 def _python_arch() -> str:
@@ -445,20 +460,37 @@ def load_orca(install: PbInstall) -> OrcaApi:
     # even though `pborc.dll` itself is at the path we hand it.
     # `runtime_path` may be None when discovery didn't find the runtime
     # directory; in that case the load may still fail with the same error.
+    # Two complementary mechanisms are needed:
+    #
+    # 1. `os.add_dll_directory(...)` covers `pborc.dll`'s static imports
+    #    (pbvm/pbshr/…). `ctypes.WinDLL` since Python 3.8 loads with
+    #    `LOAD_LIBRARY_SEARCH_DEFAULT_DIRS`, which consults user-defined
+    #    dirs added via `AddDllDirectory`. The returned handles must
+    #    outlive the load — they're moved into `OrcaApi.dll_search_handles`
+    #    and released in `Session.close()`.
+    #
+    # 2. Prepending the same dirs to `PATH` covers `pborc.dll`'s **lazy**
+    #    loads (e.g. `pblib.dll` during `SccConnectOffline`). Those go
+    #    through a plain `LoadLibraryW` whose Standard DLL Search Order
+    #    does **not** consult `AddDllDirectory` dirs, but **does** consult
+    #    `PATH`. Without this, lazy loads fail with `PBORCA_BADLIBRARY (-4)`.
+    #    The original `PATH` is snapshotted on `OrcaApi.original_path` and
+    #    restored by `Session.close()`.
     search_dirs = [install.ide_path, install.install_path]
     if install.runtime_path:
         search_dirs.append(install.runtime_path)
     added: list[Any] = []
+    original_path = os.environ.get("PATH", "")
     try:
-        try:
-            for d in search_dirs:
-                added.append(os.add_dll_directory(d))
-            dll = ctypes.WinDLL(install.orca_dll)
-        except OSError as exc:
-            raise OrcaLoadError(f"Failed to load {install.orca_dll}: {exc}") from exc
-    finally:
+        for d in search_dirs:
+            added.append(os.add_dll_directory(d))
+        os.environ["PATH"] = os.pathsep.join((*search_dirs, original_path))
+        dll = ctypes.WinDLL(install.orca_dll)
+    except OSError as exc:
         for handle in added:
             handle.close()
+        os.environ["PATH"] = original_path
+        raise OrcaLoadError(f"Failed to load {install.orca_dll}: {exc}") from exc
     try:
         session = _bind_session_fns(dll)
         library = _bind_library_fns(dll)
@@ -478,4 +510,6 @@ def load_orca(install: PbInstall) -> OrcaApi:
         compile=compile_,
         build=build,
         scc=scc,
+        dll_search_handles=tuple(added),
+        original_path=original_path,
     )

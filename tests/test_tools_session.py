@@ -83,6 +83,8 @@ def test_pb_set_library_list_rejects_empty_when_session_open(
     class _FakeApi:
         install: Any = None
         session: Any = field(default_factory=_FakeFns)
+        dll_search_handles: tuple[Any, ...] = ()
+        original_path: str = ""
 
     Session.instance().open(_FakeApi())  # type: ignore[arg-type]
     try:

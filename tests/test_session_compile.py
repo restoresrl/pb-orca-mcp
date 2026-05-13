@@ -97,6 +97,8 @@ class _FakeApi:
     session: _FakeSession = field(default_factory=_FakeSession)
     library: Any = None
     compile: _FakeCompile = field(default_factory=_FakeCompile)
+    dll_search_handles: tuple[Any, ...] = ()
+    original_path: str = ""
 
 
 @pytest.fixture

@@ -29,6 +29,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ctypes
+import os
 from ctypes import c_long, pointer
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -160,6 +161,10 @@ class Session:
 
         If SCC is still connected, calls `SccClose` first (best-effort, errors
         are swallowed — they would otherwise mask the underlying intent).
+
+        Releases the `_AddedDllDirectory` handles owned by `OrcaApi` and
+        restores `os.environ["PATH"]` to its pre-`load_orca` value (see
+        `dll.load_orca` for why both must outlive the static load).
         """
         if self._state is None:
             return
@@ -171,6 +176,10 @@ class Session:
         try:
             self._state.api.session.SessionClose(self._state.handle)
         finally:
+            for handle in self._state.api.dll_search_handles:
+                with contextlib.suppress(Exception):
+                    handle.close()
+            os.environ["PATH"] = self._state.api.original_path
             self._state.callback_refs.clear()
             self._state = None
 

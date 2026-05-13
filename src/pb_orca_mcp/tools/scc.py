@@ -30,8 +30,18 @@ from __future__ import annotations
 
 from typing import Any
 
+from pb_orca_mcp.orca.constants import PBORCA_GETCONNECT_REQ, PBORCA_REGREADERROR
 from pb_orca_mcp.orca.errors import OrcaError
 from pb_orca_mcp.orca.session import Session, SessionStateError
+
+# Codes returned by `SccGetConnectProperties` on a `.pbw` that has no SCC
+# connection block (the normal case for git/svn workflows — Appeon
+# documents the corresponding OrcaScript command as silently ignored;
+# `pborca.dll` surfaces it as `-23` or `-31` depending on whether the
+# block is missing entirely or just unreadable). In offline mode the
+# `.pbw` is not part of the connect contract, so we tolerate these
+# specific failures and fall through to the explicit kwargs.
+_PRE_READ_TOLERATED_CODES = frozenset({PBORCA_REGREADERROR, PBORCA_GETCONNECT_REQ})
 
 
 def pb_scc_get_connect_properties(workspace_file: str) -> dict[str, Any]:
@@ -71,9 +81,19 @@ def pb_scc_connect_offline(
     `ws_objects/` source-of-truth alone. Use this for the git-managed
     workflow where `ws_objects/` is canonical and `.pbl` is derived.
 
-    If `workspace_file` is supplied, defaults are read from it via
-    `SccGetConnectProperties` and any explicit kwarg overrides them.
-    Otherwise every field starts empty.
+    If `workspace_file` is supplied and contains an SCC connection block,
+    its values seed the config as best-effort defaults; any explicit kwarg
+    then overrides them. If the workspace has no SCC block (`-23`/`-31` —
+    the normal case for git/svn workspaces where offline mode is the only
+    supported flow) the pre-read is silently skipped and the connection is
+    built from the kwargs alone. Other read errors propagate.
+
+    Note: per Appeon's OrcaScript reference (`ug36631.html`), in offline
+    mode **only** `local_proj_path`, `log_file`, and `append_log` actually
+    take effect; the other kwargs (`provider_name`, `user_id`, `project`,
+    `aux_path`, `comment_max_len`, `delete_temp_files`, `delete_pbl_on_refresh`)
+    are silently ignored by the underlying SCC layer. The signature still
+    accepts them for symmetry with a future online-mode tool.
     """
     session = Session.instance()
     config: dict[str, Any] = {}
@@ -83,7 +103,8 @@ def pb_scc_connect_offline(
         except SessionStateError as exc:
             return _error("PB_ORCA_MCP_STATEERROR", str(exc))
         except OrcaError as exc:
-            return {"error": exc.to_dict()}
+            if exc.code not in _PRE_READ_TOLERATED_CODES:
+                return {"error": exc.to_dict()}
     _maybe_set(config, "provider_name", provider_name)
     _maybe_set(config, "user_id", user_id)
     _maybe_set(config, "project", project)

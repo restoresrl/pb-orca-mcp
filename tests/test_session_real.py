@@ -8,6 +8,7 @@ and returns — exercising the load_orca guardrail in lieu of the real path.
 
 from __future__ import annotations
 
+import os
 import struct
 from pathlib import Path
 
@@ -230,3 +231,39 @@ def test_compile_entry_import_happy_path_application(tmp_path: Path) -> None:
         assert "genapp" in names, f"genapp not in PBL after import; entries={names}"
     finally:
         session.close()
+
+
+@pytest.mark.requires_pb
+def test_path_env_var_roundtrip_around_load_and_close() -> None:
+    """`load_orca` prepends PB dirs to `PATH`; `Session.close()` restores it.
+
+    Regression: without the PATH prepend `pborc.dll`'s lazy `LoadLibraryW`
+    of `pblib.dll` (during e.g. `SccConnectOffline`) fails with
+    `PBORCA_BADLIBRARY (-4)` because `os.add_dll_directory` covers static
+    imports but not lazy `LoadLibraryW` calls inside the native DLL.
+    """
+    original_path = os.environ.get("PATH", "")
+    loaded = _open_pb22_or_skip()
+    if loaded is None:
+        assert os.environ.get("PATH", "") == original_path, (
+            "load_orca must restore PATH when it raises (arch mismatch case)"
+        )
+        return
+    target, api = loaded
+    assert api.original_path == original_path
+    after_load = os.environ.get("PATH", "")
+    assert after_load != original_path, "PATH should have been prepended"
+    assert after_load.startswith(target.ide_path + os.pathsep), (
+        f"PATH should start with ide_path; got {after_load[:200]}..."
+    )
+    session = Session.instance()
+    session.open(api)
+    try:
+        assert os.environ.get("PATH", "") == after_load, (
+            "session.open must not touch PATH further"
+        )
+    finally:
+        session.close()
+    assert os.environ.get("PATH", "") == original_path, (
+        "Session.close() must restore PATH to the pre-load_orca value"
+    )
