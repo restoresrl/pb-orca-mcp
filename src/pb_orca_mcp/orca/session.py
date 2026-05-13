@@ -45,9 +45,10 @@ from pb_orca_mcp.orca.constants import (
     entry_type_to_name,
     rebuild_type_from_name,
     reftype_to_name,
+    scc_refresh_flags_from_names,
 )
 from pb_orca_mcp.orca.errors import OrcaError
-from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO, PBORCA_EXEINFO
+from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO, PBORCA_EXEINFO, PBORCA_SCC
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
@@ -85,6 +86,10 @@ class _State:
     callback_refs: list[Any] = field(default_factory=list)
     last_compile_errors: list[dict[str, Any]] = field(default_factory=list)
     """Diagnostics from the most recent compile/rebuild call. Replaced on each call."""
+    scc_connected: bool = False
+    scc_callback_refs: list[Any] = field(default_factory=list)
+    """Callback refs scoped to the SCC connect → close lifetime (separate from
+    per-call `callback_refs` so they can be cleared together on `scc_close`)."""
 
 
 class Session:
@@ -151,9 +156,18 @@ class Session:
         self._state = _State(api=api, handle=handle)
 
     def close(self) -> None:
-        """Call `PBORCA_SessionClose` and clear state. No-op if not open."""
+        """Call `PBORCA_SessionClose` and clear state. No-op if not open.
+
+        If SCC is still connected, calls `SccClose` first (best-effort, errors
+        are swallowed — they would otherwise mask the underlying intent).
+        """
         if self._state is None:
             return
+        if self._state.scc_connected:
+            with contextlib.suppress(Exception):
+                self._state.api.scc.SccClose(self._state.handle)
+            self._state.scc_connected = False
+            self._state.scc_callback_refs.clear()
         try:
             self._state.api.session.SessionClose(self._state.handle)
         finally:
@@ -640,6 +654,124 @@ class Session:
         state.callback_refs.append(callback)
         return callback, errors
 
+    # --------------------------- SCC group ---------------------------
+
+    @property
+    def scc_connected(self) -> bool:
+        """True between a successful `scc_connect_offline` and `scc_close`."""
+        return self._state is not None and self._state.scc_connected
+
+    def scc_get_connect_properties(self, workspace_file: str) -> dict[str, Any]:
+        """`PBORCA_SccGetConnectProperties(handle, workspaceFile, &PBORCA_SCC)`.
+
+        Reads the SCC connection block embedded in the given workspace file
+        and returns it as a dict. Does NOT open an SCC connection — it is
+        purely read-only and may be called before/without `scc_connect_*`.
+        """
+        state = self._require_open("scc_get_connect_properties")
+        scc = PBORCA_SCC()
+        rc = state.api.scc.SccGetConnectProperties(state.handle, workspace_file, pointer(scc))
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return _scc_struct_to_dict(scc)
+
+    def scc_connect_offline(self, config: dict[str, Any]) -> dict[str, Any]:
+        """`PBORCA_SccConnectOffline(handle, &PBORCA_SCC)` — offline SCC connect.
+
+        `config` keys (all optional, missing → empty/zero):
+        `provider_name`, `user_id`, `project`, `local_proj_path`, `aux_path`,
+        `log_file`, `comment_max_len` (default 256), `append_log` (bool),
+        `delete_temp_files` (bool), `delete_pbl_on_refresh` (bool).
+
+        Returns the post-connect struct as a dict (provider populates
+        `capabilities` and may normalize some fields).
+        """
+        state = self._require_open("scc_connect_offline")
+        if state.scc_connected:
+            raise SessionStateError(
+                "SCC is already connected; call scc_close() before reconnecting"
+            )
+        scc = _scc_struct_from_dict(config)
+        rc = state.api.scc.SccConnectOffline(state.handle, pointer(scc))
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        state.scc_connected = True
+        return _scc_struct_to_dict(scc)
+
+    def scc_set_target(
+        self, target_file: str, flags: list[str] | None = None
+    ) -> list[str]:
+        """`PBORCA_SccSetTarget(handle, targetFile, lFlags, cb, NULL)`.
+
+        Returns the list of library names the callback emitted (one per
+        library affected by the target setup).
+        """
+        state = self._require_scc_connected("scc_set_target")
+        from pb_orca_mcp.orca.dll import PBORCA_SETTGTPROC  # avoid cycle
+
+        flag_int = scc_refresh_flags_from_names(flags)
+        libraries: list[str] = []
+
+        def _on_lib(p_entry: Any, _user: Any) -> None:
+            libraries.append(p_entry.contents.lpszLibraryName or "")
+
+        callback = PBORCA_SETTGTPROC(_on_lib)
+        state.callback_refs.append(callback)
+        try:
+            rc = state.api.scc.SccSetTarget(
+                state.handle, target_file, flag_int, callback, None
+            )
+        finally:
+            self._drop_callback(state, callback)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return libraries
+
+    def scc_exclude_library_list(self, lib_names: list[str]) -> None:
+        """`PBORCA_SccExcludeLibraryList(handle, libNames, count)`."""
+        state = self._require_scc_connected("scc_exclude_library_list")
+        if not lib_names:
+            raise ValueError("lib_names must contain at least one library path")
+        array_type = ctypes.c_wchar_p * len(lib_names)
+        array = array_type(*lib_names)
+        rc = state.api.scc.SccExcludeLibraryList(state.handle, array, len(lib_names))
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def scc_refresh_target(self, rebuild_type: str = "incremental") -> None:
+        """`PBORCA_SccRefreshTarget(handle, rebld_type)`.
+
+        `rebuild_type` ∈ `{"full", "incremental", "migrate", "3pass"}`. This is
+        the native equivalent of PB IDE's "Refresh PBL" — it reconciles
+        `ws_objects/` into the binary `.pbl` (add / modify / delete).
+        """
+        state = self._require_scc_connected("scc_refresh_target")
+        type_code = rebuild_type_from_name(rebuild_type)
+        rc = state.api.scc.SccRefreshTarget(state.handle, type_code)
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def scc_close(self) -> None:
+        """`PBORCA_SccClose(handle)`. Idempotent: no-op when not connected."""
+        if self._state is None or not self._state.scc_connected:
+            return
+        state = self._state
+        try:
+            rc = state.api.scc.SccClose(state.handle)
+        finally:
+            state.scc_connected = False
+            state.scc_callback_refs.clear()
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+
+    def _require_scc_connected(self, op: str) -> _State:
+        state = self._require_open(op)
+        if not state.scc_connected:
+            raise SessionStateError(
+                f"Cannot {op}: no SCC connection (call scc_connect_offline first)"
+            )
+        return state
+
     def _require_open(self, op: str) -> _State:
         if self._state is None:
             raise SessionStateError(f"Cannot {op}: no ORCA session open")
@@ -652,3 +784,46 @@ class Session:
         except Exception:
             message = ""
         return OrcaError.from_code(code, message=message)
+
+
+def _scc_struct_from_dict(config: dict[str, Any]) -> PBORCA_SCC:
+    """Build a `PBORCA_SCC` from a Python config dict (see `scc_connect_offline`).
+
+    Missing keys → empty strings / zero. `hWnd` and `pCommBlk` are always
+    NULL; the two callback pointers stay NULL in this phase (offline mode
+    does not need them).
+    """
+    scc = PBORCA_SCC()
+    scc.hWnd = None
+    scc.szProviderName = config.get("provider_name", "") or ""
+    scc.lCapabilities = 0
+    scc.szUserID = config.get("user_id", "") or ""
+    scc.szProject = config.get("project", "") or ""
+    scc.szLocalProjPath = config.get("local_proj_path", "") or ""
+    scc.szAuxPath = config.get("aux_path", "") or ""
+    scc.szLogFile = config.get("log_file", "") or ""
+    scc.fpSccMsgHandler = None
+    scc.fpOrcaMsgHandler = None
+    scc.lCommentLen = int(config.get("comment_max_len", 256))
+    scc.lAppend = 1 if config.get("append_log") else 0
+    scc.pCommBlk = None
+    scc.lDeleteTempFiles = 1 if config.get("delete_temp_files", True) else 0
+    scc.bDeletePblFlag = 1 if config.get("delete_pbl_on_refresh") else 0
+    return scc
+
+
+def _scc_struct_to_dict(scc: PBORCA_SCC) -> dict[str, Any]:
+    """Read a `PBORCA_SCC` back into a Python dict (mirror of `_scc_struct_from_dict`)."""
+    return {
+        "provider_name": _strip_buffer(scc.szProviderName),
+        "capabilities": int(scc.lCapabilities),
+        "user_id": _strip_buffer(scc.szUserID),
+        "project": _strip_buffer(scc.szProject),
+        "local_proj_path": _strip_buffer(scc.szLocalProjPath),
+        "aux_path": _strip_buffer(scc.szAuxPath),
+        "log_file": _strip_buffer(scc.szLogFile),
+        "comment_max_len": int(scc.lCommentLen),
+        "append_log": bool(scc.lAppend),
+        "delete_temp_files": bool(scc.lDeleteTempFiles),
+        "delete_pbl_on_refresh": bool(scc.bDeletePblFlag),
+    }

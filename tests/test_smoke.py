@@ -50,18 +50,23 @@ def test_cli_doctor_runs_to_completion() -> None:
     assert "Python:" in result.output
 
 
-def test_server_exposes_23_tools() -> None:
-    """Every PLAN tool is wired through to the MCP server."""
+def test_server_exposes_29_tools() -> None:
+    """Every PLAN tool is wired through to the MCP server.
+
+    23 v0.1.0 tools + 6 SCC offline-mode tools = 29.
+    """
     from pb_orca_mcp.server import tool_names
 
     names = tool_names()
-    assert len(names) == 23
+    assert len(names) == 29
     # Anchor a few names so a rename or accidental drop fails loudly.
     assert "pb_discover_pb_install" in names
     assert "pb_compile_entry_import" in names
     assert "pb_application_rebuild" in names
     assert "pb_executable_create" in names
     assert "pb_object_query_hierarchy" in names
+    assert "pb_scc_connect_offline" in names
+    assert "pb_scc_refresh_target" in names
 
 
 def test_discovery_is_importable_and_returns_tuple() -> None:

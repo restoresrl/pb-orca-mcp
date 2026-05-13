@@ -248,3 +248,45 @@ def build_flags_from_names(names: list[str] | None) -> int:
         valid = ", ".join(sorted(BUILD_FLAG_NAMES))
         raise ValueError(f"unknown build flag(s): {unknown}; valid: {valid}")
     return result
+
+
+# SCC (Source Code Control) constants from `PBORCA.H`.
+# Field lengths (the +1 NUL terminator is included in the struct array size).
+PBORCA_SCC_NAME_LEN = 31
+PBORCA_SCC_USER_LEN = 31
+PBORCA_SCC_PATH_LEN = 300
+
+# `lFlags` bitmask for `PBORCA_SccSetTarget`.
+PBORCA_SCC_REFRESH_ALL = 0x00000001
+PBORCA_SCC_OUTOFDATE = 0x00000002
+PBORCA_SCC_IMPORTONLY = 0x00000004
+PBORCA_SCC_EXCLUDE_CHECKOUT = 0x00000008
+
+SCC_REFRESH_FLAG_NAMES: dict[str, int] = {
+    "refresh_all": PBORCA_SCC_REFRESH_ALL,
+    "outofdate": PBORCA_SCC_OUTOFDATE,
+    "importonly": PBORCA_SCC_IMPORTONLY,
+    "exclude_checkout": PBORCA_SCC_EXCLUDE_CHECKOUT,
+}
+
+
+def scc_refresh_flags_from_names(names: list[str] | None) -> int:
+    """OR-fold a list of SCC-target-flag names into a single `lFlags` int.
+
+    `None` or empty list → `0`. Raises `ValueError` on any unknown name.
+    """
+    if not names:
+        return 0
+    result = 0
+    unknown: list[str] = []
+    for name in names:
+        key = name.lower()
+        flag = SCC_REFRESH_FLAG_NAMES.get(key)
+        if flag is None:
+            unknown.append(name)
+        else:
+            result |= flag
+    if unknown:
+        valid = ", ".join(sorted(SCC_REFRESH_FLAG_NAMES))
+        raise ValueError(f"unknown SCC refresh flag(s): {unknown}; valid: {valid}")
+    return result

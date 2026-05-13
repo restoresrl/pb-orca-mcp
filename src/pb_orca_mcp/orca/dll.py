@@ -28,7 +28,7 @@ import ctypes
 import os
 import struct
 import sys
-from ctypes import POINTER, WINFUNCTYPE, c_int, c_long, c_void_p, c_wchar_p
+from ctypes import POINTER, WINFUNCTYPE, c_char_p, c_int, c_long, c_ulong, c_void_p, c_wchar_p
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +40,8 @@ from pb_orca_mcp.orca.types import (
     PBORCA_HIERARCHY,
     PBORCA_LINKERR,
     PBORCA_REFERENCE,
+    PBORCA_SCC,
+    PBORCA_SETTARGET,
 )
 
 if TYPE_CHECKING:
@@ -66,6 +68,20 @@ PBORCA_HIERPROC = WINFUNCTYPE(None, POINTER(PBORCA_HIERARCHY), c_void_p)
 PBORCA_REFPROC = WINFUNCTYPE(None, POINTER(PBORCA_REFERENCE), c_void_p)
 """ctypes type for `PBORCA_REFPROC` — cross-reference callback for
 `PBORCA_ObjectQueryReference`."""
+
+LPTEXTOUTPROC = WINFUNCTYPE(c_long, c_char_p, c_ulong)
+"""ctypes type for `LPTEXTOUTPROC` — message-output callback wired into
+`PBORCA_SCC.fpSccMsgHandler`. Note the ANSI buffer (`LPCSTR`, not
+`LPCWSTR`): all other ORCA callbacks are Unicode. Decode with `mbcs` on
+the receiving side."""
+
+PBORCA_BLDPROC = WINFUNCTYPE(None, c_wchar_p, c_void_p)
+"""ctypes type for `PBORCA_BLDPROC` — progress-message callback wired into
+`PBORCA_SCC.fpOrcaMsgHandler`. Unicode."""
+
+PBORCA_SETTGTPROC = WINFUNCTYPE(None, POINTER(PBORCA_SETTARGET), c_void_p)
+"""ctypes type for `PBORCA_SETTGTPROC` — per-library callback fired by
+`PBORCA_SccSetTarget`. Same callback-lifetime caveat as the others."""
 
 KNOWN_VERSIONS = ("19.0", "22.0", "25.0")
 """PowerBuilder major versions actively tested by v1.
@@ -173,6 +189,32 @@ class BuildFns:
 
 
 @dataclass(frozen=True)
+class SccFns:
+    """Bound entry points for the ORCA Source-Code-Control group.
+
+    Subset implemented in this phase: `GetConnectProperties`,
+    `ConnectOffline`, `SetTarget`, `ExcludeLibraryList`, `RefreshTarget`,
+    `Close`. The online `Connect`, `ConnectOfflineToSourcControl`,
+    `GetLatestVer`, `SetPassword`, `ResetRevisionNumber` are left for a
+    follow-up (see plan).
+    """
+
+    SccGetConnectProperties: Any
+    """`INT PBORCA_SccGetConnectProperties(HPBORCA, LPTSTR pWorkspaceFile, PBORCA_SCC*)`."""
+    SccConnectOffline: Any
+    """`INT PBORCA_SccConnectOffline(HPBORCA, PBORCA_SCC*)`."""
+    SccSetTarget: Any
+    """`INT PBORCA_SccSetTarget(HPBORCA, LPTSTR pTargetFile, LONG lFlags,
+    PBORCA_SETTGTPROC, LPVOID UserData)`."""
+    SccExcludeLibraryList: Any
+    """`INT PBORCA_SccExcludeLibraryList(HPBORCA, LPTSTR* pLibNames, INT iNumLibs)`."""
+    SccRefreshTarget: Any
+    """`INT PBORCA_SccRefreshTarget(HPBORCA, PBORCA_REBLD_TYPE)`."""
+    SccClose: Any
+    """`INT PBORCA_SccClose(HPBORCA)`."""
+
+
+@dataclass(frozen=True)
 class OrcaApi:
     """A loaded `pborc.dll` ready for ORCA calls."""
 
@@ -183,6 +225,7 @@ class OrcaApi:
     library: LibraryFns
     compile: CompileFns
     build: BuildFns
+    scc: SccFns
 
 
 def _python_arch() -> str:
@@ -338,6 +381,42 @@ def _bind_build_fns(dll: ctypes.WinDLL) -> BuildFns:
     )
 
 
+def _bind_scc_fns(dll: ctypes.WinDLL) -> SccFns:
+    """Apply `argtypes`/`restype` to the SCC entry points."""
+    get_connect_properties = dll.PBORCA_SccGetConnectProperties
+    get_connect_properties.argtypes = [c_void_p, c_wchar_p, POINTER(PBORCA_SCC)]
+    get_connect_properties.restype = c_int
+
+    connect_offline = dll.PBORCA_SccConnectOffline
+    connect_offline.argtypes = [c_void_p, POINTER(PBORCA_SCC)]
+    connect_offline.restype = c_int
+
+    set_target = dll.PBORCA_SccSetTarget
+    set_target.argtypes = [c_void_p, c_wchar_p, c_long, PBORCA_SETTGTPROC, c_void_p]
+    set_target.restype = c_int
+
+    exclude_library_list = dll.PBORCA_SccExcludeLibraryList
+    exclude_library_list.argtypes = [c_void_p, POINTER(c_wchar_p), c_int]
+    exclude_library_list.restype = c_int
+
+    refresh_target = dll.PBORCA_SccRefreshTarget
+    refresh_target.argtypes = [c_void_p, c_int]
+    refresh_target.restype = c_int
+
+    scc_close = dll.PBORCA_SccClose
+    scc_close.argtypes = [c_void_p]
+    scc_close.restype = c_int
+
+    return SccFns(
+        SccGetConnectProperties=get_connect_properties,
+        SccConnectOffline=connect_offline,
+        SccSetTarget=set_target,
+        SccExcludeLibraryList=exclude_library_list,
+        SccRefreshTarget=refresh_target,
+        SccClose=scc_close,
+    )
+
+
 def load_orca(install: PbInstall) -> OrcaApi:
     """Load `pborc.dll` from `install.orca_dll` and bind ORCA prototypes.
 
@@ -385,6 +464,7 @@ def load_orca(install: PbInstall) -> OrcaApi:
         library = _bind_library_fns(dll)
         compile_ = _bind_compile_fns(dll)
         build = _bind_build_fns(dll)
+        scc = _bind_scc_fns(dll)
     except AttributeError as exc:
         raise OrcaLoadError(
             f"{install.orca_dll}: missing required ORCA entry point ({exc})"
@@ -397,4 +477,5 @@ def load_orca(install: PbInstall) -> OrcaApi:
         library=library,
         compile=compile_,
         build=build,
+        scc=scc,
     )

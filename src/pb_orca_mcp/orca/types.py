@@ -9,12 +9,21 @@ every modern release (see [[pborca-h]]).
 
 from __future__ import annotations
 
-from ctypes import Structure, c_int, c_long, c_uint, c_wchar, c_wchar_p
+from ctypes import Structure, c_int, c_long, c_uint, c_void_p, c_wchar, c_wchar_p
 
-from pb_orca_mcp.orca.constants import PBORCA_MAXCOMMENT
+from pb_orca_mcp.orca.constants import (
+    PBORCA_MAXCOMMENT,
+    PBORCA_SCC_NAME_LEN,
+    PBORCA_SCC_PATH_LEN,
+    PBORCA_SCC_USER_LEN,
+)
 
 _COMMENT_BUF_SIZE = PBORCA_MAXCOMMENT + 1
 """`TCHAR szComments[PBORCA_MAXCOMMENT + 1]` — 256 wchars including NUL."""
+
+_SCC_NAME_BUF = PBORCA_SCC_NAME_LEN + 1
+_SCC_USER_BUF = PBORCA_SCC_USER_LEN + 1
+_SCC_PATH_BUF = PBORCA_SCC_PATH_LEN + 1
 
 
 class PBORCA_DIRENTRY(Structure):
@@ -86,6 +95,54 @@ class PBORCA_REFERENCE(Structure):
         ("lpszEntryName", c_wchar_p),
         ("otEntryType", c_int),
         ("otEntryRefType", c_int),
+    ]
+
+
+class PBORCA_SCC(Structure):
+    """Connection/config struct shared by all `PBORCA_Scc*` functions.
+
+    The C layout is documented in `PBORCA.H`. Field widths come from
+    `PBORCA_SCC_NAME_LEN+1`, `_USER_LEN+1`, `_PATH_LEN+1` in the header.
+
+    `fpSccMsgHandler` (`LPTEXTOUTPROC`) takes an ANSI (`LPCSTR`) buffer —
+    unlike every other callback in ORCA which is Unicode. `fpOrcaMsgHandler`
+    (`PBORCA_BLDPROC`) is Unicode. Both pointers are stored as `c_void_p`
+    here; the Session installs `ctypes` `WINFUNCTYPE` instances when needed
+    and keeps them alive in `scc_callback_refs` for the connect lifetime.
+
+    `pCommBlk` is the opaque SCC communication block. Always `None` from
+    Python.
+    """
+
+    _fields_ = [
+        ("hWnd", c_void_p),
+        ("szProviderName", c_wchar * _SCC_NAME_BUF),
+        ("lCapabilities", c_long),
+        ("szUserID", c_wchar * _SCC_USER_BUF),
+        ("szProject", c_wchar * _SCC_PATH_BUF),
+        ("szLocalProjPath", c_wchar * _SCC_PATH_BUF),
+        ("szAuxPath", c_wchar * _SCC_PATH_BUF),
+        ("szLogFile", c_wchar * _SCC_PATH_BUF),
+        ("fpSccMsgHandler", c_void_p),
+        ("fpOrcaMsgHandler", c_void_p),
+        ("lCommentLen", c_long),
+        ("lAppend", c_long),
+        ("pCommBlk", c_void_p),
+        ("lDeleteTempFiles", c_long),
+        ("bDeletePblFlag", c_int),
+    ]
+
+
+class PBORCA_SETTARGET(Structure):
+    """Callback record for `PBORCA_SETTGTPROC` fired by `PBORCA_SccSetTarget`.
+
+    The callback fires once per library affected by the target setup. The
+    Session accumulates `lpszLibraryName` values into a list returned to the
+    caller.
+    """
+
+    _fields_ = [
+        ("lpszLibraryName", c_wchar_p),
     ]
 
 

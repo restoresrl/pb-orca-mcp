@@ -24,6 +24,7 @@ from pb_orca_mcp.tools import compile as compile_tools
 from pb_orca_mcp.tools import discovery as discovery_tools
 from pb_orca_mcp.tools import library as library_tools
 from pb_orca_mcp.tools import query as query_tools
+from pb_orca_mcp.tools import scc as scc_tools
 from pb_orca_mcp.tools import session as session_tools
 
 if TYPE_CHECKING:
@@ -63,6 +64,13 @@ _TOOLS: tuple[tuple[Callable[..., object], str], ...] = (
     (query_tools.pb_object_query_hierarchy, "pb_object_query_hierarchy"),
     (query_tools.pb_object_query_reference, "pb_object_query_reference"),
     (query_tools.pb_object_regenerate, "pb_object_regenerate"),
+    # SCC (Source Code Control) — offline-mode "Refresh PBL" flow
+    (scc_tools.pb_scc_get_connect_properties, "pb_scc_get_connect_properties"),
+    (scc_tools.pb_scc_connect_offline, "pb_scc_connect_offline"),
+    (scc_tools.pb_scc_set_target, "pb_scc_set_target"),
+    (scc_tools.pb_scc_exclude_library_list, "pb_scc_exclude_library_list"),
+    (scc_tools.pb_scc_refresh_target, "pb_scc_refresh_target"),
+    (scc_tools.pb_scc_close, "pb_scc_close"),
 )
 
 
