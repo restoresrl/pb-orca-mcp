@@ -20,16 +20,19 @@ il full ORCA loop. 107 pytest verdi incluso l'happy-path `requires_pb` su
 PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
 con Claude Code in driver.
 
-Repo: https://github.com/restoresrl/pb-orca-mcp — privato Restore org per
-ora; flip a pubblico quando il rilascio PyPI è pronto.
+Repo: https://github.com/restoresrl/pb-orca-mcp — **privato Restore
+org, in fase di dogfooding interno**. Flip a pubblico + PyPI publish
+rimandati a quando l'uso reale su workspace Magware reali avrà
+confermato stabilità. Nessuna scadenza fissa.
 
-**Decisioni aperte per il go-live PyPI** (vedi anche `PLAN.md`): flip
-repo `restoresrl/pb-orca-mcp` da privato a pubblico, `python -m build`
-+ `twine upload`. Nome `pb-orca-mcp` su PyPI verificato libero
-(2026-05-14). Count tool allineato a 29 in README/PLAN/docs
-(2026-05-14, include il gruppo SCC). Licenza già scelta: MIT
-(`LICENSE` nel repo + `pyproject.toml`). Fix asimmetria export/import
-in `docs/recipes.md` Recipe 1 già committato (commit `67d97f3`).
+**Stato pre-publish** (vedi anche `PLAN.md`): pre-flight cleanups
+docs/hygiene già fatti (commit `876c34d` 2026-05-14). Nome `pb-orca-mcp`
+su PyPI verificato libero. Count tool allineato a 29 in README/PLAN/docs
+(include il gruppo SCC). Licenza MIT. Fix asimmetria export/import in
+`docs/recipes.md` Recipe 1 committato (`67d97f3`). Wheel + sdist
+buildati localmente in `dist/`, pronti per twine upload futuro. Restano
+da fare al momento del flip: aggiornare la nota in fondo a questa
+sezione + `gh repo edit ... --visibility public` + `twine upload`.
 
 ## Stack & convenzioni
 
