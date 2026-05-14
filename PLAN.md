@@ -112,9 +112,15 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | `pb_object_query_reference` | `PBORCA_ObjectQueryReference` | Chi referenzia chi |
 | `pb_object_regenerate` | `PBORCA_ObjectRegenerate` | Rebuild singolo oggetto |
 | `pb_get_last_compile_errors` | (buffer interno) | Errori dall'ultima Compile/Rebuild call |
+| `pb_scc_connect_offline` | `PBORCA_SccConnectOffline` | Apre connessione SCC offline (git/svn). Niente server SCC remoto |
+| `pb_scc_set_target` | `PBORCA_SccSetTarget` | Bind target `.pbt` alla sessione SCC. **Side effect**: configura anche library list e current application |
+| `pb_scc_refresh_target` | `PBORCA_SccRefreshTarget` | Sync `ws_objects/` → `.pbl` (add/modify/delete) — equivalente nativo del "Refresh PBL" di PB IDE |
+| `pb_scc_exclude_library_list` | `PBORCA_SccExcludeLibraryList` | Esclude `.pbd` reference dal refresh |
+| `pb_scc_get_connect_properties` | `PBORCA_SccGetConnectProperties` | Legge SCC block dal `.pbw` (ritorna `-23` su workspace git/svn, atteso) |
+| `pb_scc_close` | `PBORCA_SccClose` | Chiude la connessione SCC |
 
-Tool **non** esposti in v1 (esistono in ORCA ma valore marginale per agente):
-- `PBORCA_Scc*` (source control connector) — la maggior parte degli utenti PB moderni usa git, non MSSCCI.
+Tool **non** esposti (esistono in ORCA ma valore marginale per agente):
+- `PBORCA_Scc*` connect (online mode) — i `Scc*` esposti sopra coprono il caso offline git/svn; il connect online richiede MSSCCI provider, fuori scope per workflow git moderni.
 - `PBORCA_BuildProject` / `BuildProjectEx` / `BuildProjectWithOverrides` — **deprecati in R3**, usiamo `ApplicationRebuild`.
 - `PBORCA_LibraryEntryCopy` — semantica "copia entry tra PBL" sovrapposta a `Move`+`Export`+`CompileEntryImport`. Disponibile in ORCA, non esposto in v1.
 
@@ -228,7 +234,7 @@ Save Format v3.0(19990112)        <- magic header costante (format-version del f
 @end;
 appname "myapp";
 applib "myapp.pbl";
-LibList "myapp.pbl;..\\dep\\rstpb_core.pbl;..\\dep\\pbunit.pbd";
+LibList "myapp.pbl;..\\dep\\corelib.pbl;..\\dep\\testlib.pbd";
 type "pb";                          <- pb | component | asm | ...
 ```
 
@@ -248,9 +254,9 @@ DefaultRemoteTarget "src\\main.pbt";
 Note:
 - Magic header `Save Format v3.0(19990112)` è **costante** (data di freeze del formato Sybase, 1999-01-12). **Non identifica la versione PB**.
 - Keyword sono case-insensitive (`LibList` ↔ `liblist` osservati nello stesso codebase).
-- Stringhe usano escape stile C-string per i backslash dei path (`..\\dep\\rstpb_core.pbl`).
+- Stringhe usano escape stile C-string per i backslash dei path (`..\\dep\\corelib.pbl`).
 - `LibList` separa con `;`.
-- I file PB di progetto/workspace **non contengono la versione PowerBuilder** (verificato su `.pbt` PB 19, 22, 25 e `.pbw` di workspace mw24/mw25). La selezione della DLL ORCA è quindi sempre esplicita lato chiamante.
+- I file PB di progetto/workspace **non contengono la versione PowerBuilder** (verificato su `.pbt` PB 19, 22, 25 e su `.pbw` di workspace reali multi-target). La selezione della DLL ORCA è quindi sempre esplicita lato chiamante.
 
 Tool `pb_target_info`:
 
@@ -348,7 +354,7 @@ Tutti i path relativi alla root del repository:
 ## Verifica end-to-end
 
 1. **Install**: `uv tool install pb-orca-mcp` su una Windows con almeno una PB IDE installazione. Comando `pb-orca-mcp doctor` deve passare (rileva DLL, conferma arch, lista tutte le install trovate).
-2. **Integrazione Claude Code**: aggiungere snippet a `~/.claude/mcp.json`, riavviare Claude Code, verificare che i ~23 tool `pb_*` siano elencati in `/mcp`.
+2. **Integrazione Claude Code**: aggiungere snippet a `~/.claude/mcp.json`, riavviare Claude Code, verificare che i 29 tool `pb_*` siano elencati in `/mcp`.
 3. **Session smoke test**: prompt "apri sessione ORCA". Tool `pb_session_open` ritorna success con `pb_version: "22.0"` e `dll_path` valido.
 4. **Library inspection** (fixture): `pb_library_directory` su `tests/fixtures/tiny_app/main.pbl` → lista coerente con quello che PB IDE mostra (oggetti, tipi, comment).
 5. **Compile-test loop** (fixture): export di una function, modifica intenzionale rotta, `pb_compile_entry_import` → errori riportati con line/column corretti. Correggi, re-import → success.
@@ -360,7 +366,7 @@ Tutti i path relativi alla root del repository:
 
 ## Out of scope (esplicitamente)
 
-- Source Control Connector (SCC) — niente `PBORCA_Scc*` (chi usa PB con SCC è una minoranza, git è lo standard).
+- SCC online mode (MSSCCI provider) — fuori scope; gli `Scc*` esposti sono solo per il connect offline su workspace git/svn, equivalente al "Refresh PBL" di PB IDE. Vedi sezione "Tool MCP esposti".
 - Sostituzione di workflow batch tipo PowerGen / OrcaScript / script custom — il server è strumento di sviluppo interattivo, non build runner di rilascio.
 - Integrazione con `.gen` file PowerGen — il server lavora su `.pbt`/`.pbl` direttamente.
 - UI / dashboard — è puro MCP server stdio.
@@ -375,4 +381,4 @@ Tutti i path relativi alla root del repository:
 | **Disponibilità nome `pb-orca-mcp` su PyPI** | Prima di pubblicare la v0.1 | Check `pip index versions pb-orca-mcp` + reserve squat. Alternative se occupato: `powerbuilder-orca-mcp`, `pb-orca` |
 
 Decisioni risolte:
-- ✅ **Git remote**: `https://github.com/restoresrl/pb-orca-mcp` (private GitHub org Restore srl), pushed 2026-05-12.
+- ✅ **Git remote**: `https://github.com/restoresrl/pb-orca-mcp` (GitHub repo under Restore srl org), pushed 2026-05-12.

@@ -92,9 +92,9 @@ def test_parse_pbw_targets_block() -> None:
 
 
 def test_parse_pbw_unordered_indices_kept_in_file_order() -> None:
-    """Real .pbw files (e.g. magware/mw\\magware.pbw) write target indices
-    in non-numeric order. The parser preserves file order rather than
-    sorting by the leading integer."""
+    """Real .pbw files write target indices in non-numeric order. The
+    parser preserves file order rather than sorting by the leading
+    integer."""
     text = (
         "Save Format v3.0(19990112)\n"
         "@begin Targets\n"

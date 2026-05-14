@@ -15,7 +15,7 @@ The bootstrap of every session is the same:
 {"tool": "pb_set_library_list", "args": {
   "libraries": [
     "C:\\proj\\myapp.pbl",
-    "C:\\proj\\dep\\rstpb_core.pbl"
+    "C:\\proj\\dep\\corelib.pbl"
   ]
 }}
 
@@ -91,13 +91,13 @@ whole list as one batch, reusing parser state where possible.
 {"tool": "pb_compile_entry_import_list", "args": {
   "items": [
     {
-      "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+      "lib_path": "C:\\proj\\dep\\corelib.pbl",
       "entry_name": "f_split",
       "entry_type": "function",
       "syntax": "<edited source>"
     },
     {
-      "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+      "lib_path": "C:\\proj\\dep\\corelib.pbl",
       "entry_name": "f_join",
       "entry_type": "function",
       "syntax": "<edited source>"
@@ -147,13 +147,13 @@ After the rebuild is clean, produce a runnable executable:
     ["machine_code"]                       // second non-app PBL → .pbd
   ],
   "exe_info": {
-    "company_name": "Restore srl",
+    "company_name": "Acme Corp",
     "product_name": "MyApp",
     "file_version": "1.4.2",
     "file_version_num": "1.4.2.0",
     "product_version": "1.4.2",
     "product_version_num": "1.4.2.0",
-    "copyright": "(c) 2026 Restore srl"
+    "copyright": "(c) 2026 Acme Corp"
   }
 }}
 ```
@@ -180,14 +180,15 @@ matters more than runtime speed.
 ## Recipe 5 — Build a single `.pbd` for vendoring
 
 When a downstream consumer pulls a compiled snapshot of a library (the
-"vendor the `.pbd` into `dep/`" pattern from the Restore Magware stack):
+"vendor the `.pbd` into `dep/`" pattern common in PB projects that
+distribute reusable libraries):
 
 ```jsonc
 {"tool": "pb_dynamic_library_create", "args": {
-  "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+  "lib_path": "C:\\proj\\dep\\corelib.pbl",
   "flags": ["machine_code", "optimize_speed"]
 }}
-// → produces rstpb_core.pbd next to rstpb_core.pbl
+// → produces corelib.pbd next to corelib.pbl
 ```
 
 ---
@@ -219,7 +220,7 @@ it:
 
 ```jsonc
 {"tool": "pb_object_query_reference", "args": {
-  "lib_path": "C:\\proj\\dep\\rstpb_core.pbl",
+  "lib_path": "C:\\proj\\dep\\corelib.pbl",
   "entry_name": "f_legacy_thing",
   "entry_type": "function"
 }}

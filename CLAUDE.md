@@ -15,7 +15,7 @@ agentico.
 
 ## Stato
 
-**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 23 tool MCP che coprono
+**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 29 tool MCP che coprono
 il full ORCA loop. 107 pytest verdi incluso l'happy-path `requires_pb` su
 PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
 con Claude Code in driver.
@@ -23,11 +23,13 @@ con Claude Code in driver.
 Repo: https://github.com/restoresrl/pb-orca-mcp — privato Restore org per
 ora; flip a pubblico quando il rilascio PyPI è pronto.
 
-**Decisioni aperte per il go-live PyPI** (vedi anche `PLAN.md`): verifica
-disponibilità nome `pb-orca-mcp` su PyPI, fix `docs/recipes.md` (la
-recipe del compile loop è imprecisa sull'asimmetria export/import —
-vedi "Cose da tenere a mente" sotto). Licenza già scelta: MIT
-(`LICENSE` nel repo + `pyproject.toml`).
+**Decisioni aperte per il go-live PyPI** (vedi anche `PLAN.md`): flip
+repo `restoresrl/pb-orca-mcp` da privato a pubblico, `python -m build`
++ `twine upload`. Nome `pb-orca-mcp` su PyPI verificato libero
+(2026-05-14). Count tool allineato a 29 in README/PLAN/docs
+(2026-05-14, include il gruppo SCC). Licenza già scelta: MIT
+(`LICENSE` nel repo + `pyproject.toml`). Fix asimmetria export/import
+in `docs/recipes.md` Recipe 1 già committato (commit `67d97f3`).
 
 ## Stack & convenzioni
 
@@ -140,8 +142,8 @@ vedi "Cose da tenere a mente" sotto). Licenza già scelta: MIT
 - **Asimmetria export/import**: `library_entry_export` ritorna **solo il
   body** (senza `$PBExportHeader$...`), mentre `compile_entry_import` lo
   **richiede**. Roundtrip diretto export→import senza riattaccare
-  l'header non funziona. La recipe in `docs/recipes.md` è imprecisa su
-  questo punto — TODO chiarire.
+  l'header non funziona. Documentato in `docs/recipes.md` Recipe 1
+  (commit `67d97f3`) e in `docs/workflow.md`.
 - **Bootstrap catch-22 per PBL vuote**: `SessionSetCurrentAppl` rifiuta
   con `PBORCA_OBJNOTFOUND (-3)` un app_name che non esiste già nella pbl,
   ma `CompileEntryImport` richiede current_app set anche per importare
@@ -154,6 +156,23 @@ vedi "Cose da tenere a mente" sotto). Licenza già scelta: MIT
   può corrompere il source originale dell'entry. Se servono semantiche
   atomiche, snapshot dei bytes della pbl prima della call e restore on
   failure.
+
+## Sibling project — `pb-ai-code`
+
+Esiste un repo gemello, `../pb-ai-code/` (creato 2026-05-14, ancora in
+design phase): è il **dev kit agentico per PowerBuilder** che ha
+`pb-orca-mcp` come dipendenza required e ci costruisce sopra skill, docs
+Appeon ingestite, orchestrazione di test, pattern di debug post-mortem e
+slash command. La visione 4-pilastri (progettazione + coding + testing +
+debugging agentico su PB) vive lì, non qui.
+
+`pb-orca-mcp` resta scope-limited all'API ORCA (engine + primitive); la
+parte di workflow + knowledge + orchestrazione sta in `pb-ai-code`
+(experience). Lavoro attivo su `pb-ai-code` parte **dopo** il PyPI
+publish di questo repo.
+
+Vedi [`../pb-ai-code/PLAN.md`](../pb-ai-code/PLAN.md) per il design
+completo e [[sibling-pb-ai-code]] in memory per il quick reference.
 
 ## Riferimenti
 

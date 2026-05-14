@@ -66,7 +66,7 @@ usable from the current Python interpreter.
 
 ## What it exposes
 
-Every function in ORCA's public API is mapped to one MCP tool. 23 tools
+Every function in ORCA's public API is mapped to one MCP tool. 29 tools
 total, grouped:
 
 | Group | Tools |
@@ -77,6 +77,7 @@ total, grouped:
 | Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
 | Build | `pb_executable_create`, `pb_dynamic_library_create` |
 | Query | `pb_object_query_hierarchy`, `pb_object_query_reference`, `pb_object_regenerate` |
+| SCC | `pb_scc_connect_offline`, `pb_scc_set_target`, `pb_scc_refresh_target`, `pb_scc_exclude_library_list`, `pb_scc_get_connect_properties`, `pb_scc_close` |
 
 Full reference with input/output schema: [`docs/tools.md`](docs/tools.md).
 Workflow recipes (compile-test loop, EXE build, hierarchy walk): [`docs/recipes.md`](docs/recipes.md).
@@ -120,6 +121,15 @@ Next: first PyPI publish; community feedback round.
 - [`docs/tools.md`](docs/tools.md) — every MCP tool, input/output schema, examples
 - [`docs/recipes.md`](docs/recipes.md) — end-to-end workflows
 - [`PLAN.md`](PLAN.md) — full design document
+
+## Related projects
+
+- [`pb-ai-code`](https://github.com/restoresrl/pb-ai-code) — agentic dev
+  kit for PowerBuilder built on top of `pb-orca-mcp`: skills, ingested
+  Appeon docs, test orchestration, debugging patterns and slash
+  commands for full agentic PB development (design, code, test, debug).
+  Currently in design phase; depends on this server as a required PyPI
+  library.
 
 ## License
 
