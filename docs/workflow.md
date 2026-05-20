@@ -378,7 +378,7 @@ Read:
 - `pb_library_entry_information` — metadata of a single entry
 - `pb_library_entry_export` — return an entry's source as a string
 - `pb_object_query_hierarchy` — walk the ancestor chain
-- `pb_object_query_reference` — find references to a named object
+- `pb_object_query_reference` — list a named object's outgoing references (what it calls/uses)
 
 Write:
 

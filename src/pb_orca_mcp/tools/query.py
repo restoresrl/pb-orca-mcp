@@ -3,9 +3,12 @@
 Tools:
 - `pb_object_query_hierarchy(lib_path, entry_name, entry_type)`: return the
   ancestor chain (list of ancestor names, closest first).
-- `pb_object_query_reference(lib_path, entry_name, entry_type)`: list every
-  entry in the library list that references the named object, with their
-  `library`, `entry_name`, `entry_type`, and `ref_type` (`simple`/`open`).
+- `pb_object_query_reference(lib_path, entry_name, entry_type)`: list the
+  entries that the named object references — its **outgoing** dependencies
+  (callees, ancestors used, types declared, windows opened, etc.). Each
+  result has `library`, `entry_name`, `entry_type`, and `ref_type`
+  (`simple`/`open`). ORCA does not expose an incoming-direction primitive;
+  finding "who calls this entry" requires inverting the index.
 - `pb_object_regenerate(lib_path, entry_name, entry_type)`: alias for
   `PBORCA_CompileEntryRegenerate` from phase 5 — re-emit object code for a
   single entry without touching the source.

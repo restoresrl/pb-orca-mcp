@@ -620,7 +620,7 @@ class Session:
     def object_query_reference(
         self, lib_path: str, entry_name: str, entry_type: str
     ) -> list[dict[str, Any]]:
-        """`PBORCA_ObjectQueryReference` — list every entry that references this one."""
+        """`PBORCA_ObjectQueryReference` — list the entries this one references (outgoing deps)."""
         state = self._require_open("object_query_reference")
         type_code = entry_type_from_name(entry_type)
         from pb_orca_mcp.orca.dll import PBORCA_REFPROC

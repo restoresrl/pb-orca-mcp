@@ -213,23 +213,23 @@ inherited surface area.
 
 ---
 
-## Recipe 7 — "Who calls this?" reference audit
+## Recipe 7 — "What does this call?" outgoing-reference audit
 
-Before deleting or renaming a function, find every entry that references
-it:
+Before refactoring an entry, list everything it depends on (callees,
+ancestors used, types declared, windows opened, etc.):
 
 ```jsonc
 {"tool": "pb_object_query_reference", "args": {
-  "lib_path": "C:\\proj\\dep\\corelib.pbl",
-  "entry_name": "f_legacy_thing",
-  "entry_type": "function"
+  "lib_path": "C:\\proj\\myapp.pbl",
+  "entry_name": "w_main",
+  "entry_type": "window"
 }}
 // → {
 //      "count": 7,
 //      "references": [
-//        {"library": "C:\\proj\\myapp.pbl",
-//         "entry_name": "w_main",
-//         "entry_type": "window",
+//        {"library": "C:\\proj\\dep\\corelib.pbl",
+//         "entry_name": "f_legacy_thing",
+//         "entry_type": "function",
 //         "ref_type": "simple"},
 //        ...
 //      ]
@@ -238,6 +238,12 @@ it:
 
 `ref_type` is `"simple"` (declarative reference: function call, type
 declaration) or `"open"` (runtime `OpenWithParm` / `Open` of a window).
+
+**Note on direction**. ORCA's `PBORCA_ObjectQueryReference` returns
+the *outgoing* references of the queried object — what it uses, not
+what uses it. There is no native ORCA primitive for the incoming
+direction ("who calls this"); reconstructing it requires iterating
+every candidate caller in the library list and inverting the result.
 
 ---
 

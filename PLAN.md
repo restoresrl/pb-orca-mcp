@@ -109,7 +109,7 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | `pb_executable_create` | `PBORCA_ExecutableCreate` | Build EXE, con PBR/icon/flag machine code |
 | `pb_dynamic_library_create` | `PBORCA_DynamicLibraryCreate` | Build PBD da una PBL |
 | `pb_object_query_hierarchy` | `PBORCA_ObjectQueryHierarchy` | Catena di ereditarietà |
-| `pb_object_query_reference` | `PBORCA_ObjectQueryReference` | Chi referenzia chi |
+| `pb_object_query_reference` | `PBORCA_ObjectQueryReference` | Outgoing refs di un entry (cosa usa/chiama) |
 | `pb_object_regenerate` | `PBORCA_ObjectRegenerate` | Rebuild singolo oggetto |
 | `pb_get_last_compile_errors` | (buffer interno) | Errori dall'ultima Compile/Rebuild call |
 | `pb_scc_connect_offline` | `PBORCA_SccConnectOffline` | Apre connessione SCC offline (git/svn). Niente server SCC remoto |

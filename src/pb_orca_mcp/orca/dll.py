@@ -66,8 +66,10 @@ PBORCA_HIERPROC = WINFUNCTYPE(None, POINTER(PBORCA_HIERARCHY), c_void_p)
 `PBORCA_ObjectQueryHierarchy`."""
 
 PBORCA_REFPROC = WINFUNCTYPE(None, POINTER(PBORCA_REFERENCE), c_void_p)
-"""ctypes type for `PBORCA_REFPROC` — cross-reference callback for
-`PBORCA_ObjectQueryReference`."""
+"""ctypes type for `PBORCA_REFPROC` — outgoing-reference callback for
+`PBORCA_ObjectQueryReference`. The ORCA API delivers one entry per
+callback invocation, each describing an *outgoing* dependency of the
+queried object (what it calls/uses, not what uses it)."""
 
 LPTEXTOUTPROC = WINFUNCTYPE(c_long, c_char_p, c_ulong)
 """ctypes type for `LPTEXTOUTPROC` — message-output callback wired into

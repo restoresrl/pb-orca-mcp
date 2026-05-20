@@ -312,8 +312,12 @@ first, not including the entry itself.
 
 ### `pb_object_query_reference(lib_path, entry_name, entry_type)`
 
-List every entry in the configured library list that references the named
-object.
+List the entries that the named object references — its **outgoing**
+dependencies (callees, ancestors used, types declared, windows opened,
+etc.). This is the outgoing direction of the cross-reference graph;
+ORCA does not expose an incoming-direction primitive, so finding
+"who calls this entry" requires inverting the index by querying every
+candidate caller in the library list.
 
 **Output**:
 ```json
