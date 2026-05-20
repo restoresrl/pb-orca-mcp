@@ -38,6 +38,12 @@ Each subsequent recipe assumes that bootstrap is already done.
 The inner loop of agentic PB development: an entry is broken, the agent
 edits the source, re-imports it, reads the compile errors, and iterates.
 
+**TL;DR — single-call form.** If you also want the on-disk `.sr*` file
+in `ws_objects/` updated alongside the `.pbl` import (the usual case
+when the workspace is the SOT), use `pb_edit_and_import` and skip
+Recipe 1.5 below. The three-step manual form here is documented for
+fine control or for callers that don't need to touch the SOT file.
+
 ```jsonc
 // Step 1: read the current source
 {"tool": "pb_library_entry_export", "args": {
@@ -79,6 +85,57 @@ edits the source, re-imports it, reads the compile errors, and iterates.
 When `success: false`, the `errors` array carries the same diagnostics the
 PB IDE would show — line/column included. The agent can correlate
 `message_text` and `line` with the source it just submitted and iterate.
+
+---
+
+## Recipe 1.5 — Atomic edit + import (single call)
+
+Same outcome as Recipe 1 but in a single tool call. Use this when the
+workspace's `ws_objects/<lib>.pbl.src/<entry_name>.<ext>` is the source
+of truth and must be kept in sync with the `.pbl`.
+
+```jsonc
+{"tool": "pb_edit_and_import", "args": {
+  "lib_path":    "C:\\proj\\myapp.pbl",
+  "entry_name":  "f_compute_total",
+  "entry_type":  "function",
+  // body only — the $PBExportHeader$ line will be prepended automatically
+  "syntax":      "global type f_compute_total ...\n...",
+  "source_path": "C:\\proj\\ws_objects\\myapp.pbl.src\\f_compute_total.srf",
+  "comments":    "fixed null-dereference in line 142"
+}}
+// → {
+//      "success": true,
+//      "lib_path":    "...",
+//      "entry_name":  "f_compute_total",
+//      "entry_type":  "function",
+//      "source_path": "...",
+//      "errors": []
+//    }
+```
+
+What the tool does atomically:
+
+1. Resolves the on-disk extension from `entry_type` (`function` → `srf`,
+   `userobject` → `sru`, etc.).
+2. Prepends `$PBExportHeader$f_compute_total.srf\r\n` to `syntax` if
+   it's not already there.
+3. Writes the resulting text to `source_path` in UTF-16 LE BOM + CRLF
+   (via temp file + atomic rename on the same volume).
+4. Calls `PBORCA_CompileEntryImport` with the same text.
+5. Returns the unified `{success, errors}` plus the input echo.
+
+Failure modes:
+
+- `entry_type` has no canonical `.sr*` extension (`project`,
+  `proxyobject`, `binary`) → `PB_ORCA_MCP_INVALIDARGS`.
+- Filesystem error while writing (parent dir missing, permission
+  denied, disk full) → `PB_ORCA_MCP_IOERROR`. The `.pbl` is NOT
+  touched.
+- Compile diagnostics → `success: false` with populated `errors`, same
+  as `pb_compile_entry_import`. The on-disk file is still updated
+  (the SOT and the failed-compile `.pbl` may diverge intentionally
+  while you iterate).
 
 ---
 

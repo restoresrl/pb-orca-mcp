@@ -248,6 +248,31 @@ Batch version. `items` is a list of dicts:
 ]
 ```
 
+### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="")`
+
+Atomic write-then-import. Persists `syntax` to `source_path` on disk in
+canonical PB encoding (UTF-16 LE BOM + CRLF), auto-prepends the
+`$PBExportHeader$<entry_name>.<ext>` first line if not already present,
+and then imports `syntax` into `lib_path`.
+
+Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
+to UTF-16 + agent calls `pb_compile_entry_import`" pattern with a
+single call. Same response shape as `pb_compile_entry_import` plus
+`source_path` echoed back.
+
+The on-disk extension is derived from `entry_type` via the
+`ENTRY_TYPE_EXTENSIONS` map in `pb_orca_mcp.orca.constants` (`sru`,
+`srw`, `srf`, `srd`, `srm`, `srs`, `sra`, `srp`, `srq`). Entry types
+without a canonical source extension (`project`, `proxyobject`,
+`binary`) raise `PB_ORCA_MCP_INVALIDARGS`.
+
+`source_path` parent directories must already exist; the write is
+atomic (temp-file + replace on the same volume). On filesystem error
+the tool returns `PB_ORCA_MCP_IOERROR`.
+
+**Output**: `{"success", "lib_path", "entry_name", "entry_type",
+"source_path", "errors": [...]}`.
+
 ### `pb_application_rebuild(rebuild_type="incremental")`
 
 Full / incremental / migrate / 3-pass rebuild of the current application.

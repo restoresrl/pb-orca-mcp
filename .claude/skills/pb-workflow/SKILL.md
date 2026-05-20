@@ -41,14 +41,35 @@ proof that on git projects the textual form is canonical.
    pb_set_current_application {"app_lib": ..., "app_name": ...}
    ```
 
-4. Read the file you just edited and propagate to the `.pbl`:
+4. Read the file you just edited and propagate to the `.pbl`.
+
+   **Preferred (single tool call)** — `pb_edit_and_import` does the
+   on-disk SOT write (UTF-16 LE BOM + CRLF + `$PBExportHeader$` auto-
+   prepended) plus the `.pbl` import atomically:
 
    ```jsonc
+   pb_edit_and_import {
+     "lib_path":    "...\\src\\<lib>.pbl",
+     "entry_name":  "<entry>",
+     "entry_type":  "<userobject|function|window|application|...>",
+     "syntax":      "<edited body — header optional>",
+     "source_path": "...\\ws_objects\\<lib>.pbl.src\\<entry>.<ext>",
+     "comments":    "optional commit-style message"
+   }
+   ```
+
+   **Manual three-step form** — use when you want fine control over
+   the encoding step, or when the SOT file is not under `ws_objects/`:
+
+   ```jsonc
+   // (4a) The agent edits the .sr* file via host tools.
+   // (4b) Re-encode UTF-8 -> UTF-16 LE BOM (see "Pitfalls" below).
+   // (4c) Then call pb_compile_entry_import directly:
    pb_compile_entry_import {
      "lib_path": "...\\src\\<lib>.pbl",
      "entry_name": "<entry>",
      "entry_type": "<userobject|function|window|application|...>",
-     "syntax": "<full file content>"
+     "syntax": "$PBExportHeader$<entry>.<ext>\r\n<full file content>"
    }
    ```
 
@@ -106,16 +127,22 @@ The `.pbl` is canonical. Work in memory.
   produce `.pbd` files.
 - **`pb_compile_entry_import` does not auto-update `ws_objects/`**
   (verified experimentally). On git projects you handle the SOT file
-  with your host tools; ORCA's job is the `.pbl`.
+  with your host tools; ORCA's job is the `.pbl`. **Mitigation**: use
+  `pb_edit_and_import` instead — it writes the SOT file and imports
+  in a single atomic call.
 - **Edit tools may flip `.sr*` files from UTF-16 LE BOM to UTF-8 BOM**
   on save. PB rejects the converted file. After any host-tool edit on
   a `.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`, reconvert with PowerShell:
   `[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode)`
   (the .NET name "Unicode" is UTF-16 LE BOM). First 2 bytes should be
   `FF FE`. See `docs/workflow.md` "Encoding caveat" for details.
+  **Mitigation**: use `pb_edit_and_import` — it writes UTF-16 LE BOM
+  + CRLF natively, no host-tool round-trip involved.
 - **Export/import asymmetry**: `pb_library_entry_export` returns the
   body only; `pb_compile_entry_import` requires `$PBExportHeader$<name>.<ext>`
   as the first line of `syntax`. Re-prepend it manually for round-trips.
+  **Mitigation**: `pb_edit_and_import` prepends the header
+  automatically when missing.
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically.
   Always check `git status` and revert unless you added a target.
 

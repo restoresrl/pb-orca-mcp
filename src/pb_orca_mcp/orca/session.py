@@ -30,6 +30,7 @@ import asyncio
 import contextlib
 import ctypes
 import os
+import pathlib
 from ctypes import c_long, pointer
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -44,6 +45,7 @@ from pb_orca_mcp.orca.constants import (
     compile_level_to_name,
     entry_type_from_name,
     entry_type_to_name,
+    extension_for_entry_type,
     rebuild_type_from_name,
     reftype_to_name,
     scc_refresh_flags_from_names,
@@ -413,6 +415,70 @@ class Session:
         finally:
             self._drop_callback(state, callback)
         return self._compile_result(state, rc, errors)
+
+    def edit_and_import(
+        self,
+        lib_path: str,
+        entry_name: str,
+        entry_type: str,
+        syntax: str,
+        source_path: str,
+        comments: str = "",
+    ) -> tuple[bool, list[dict[str, Any]]]:
+        """Atomic write-then-import for a PowerBuilder entry source.
+
+        Combines the three operations an agent normally has to chain:
+
+        1. Persist `syntax` to `source_path` on disk in the canonical PB
+           encoding (UTF-16 LE BOM + CRLF). This keeps the workspace's
+           SOT (`ws_objects/<lib>.pbl.src/<entry_name>.<ext>`) coherent
+           with what's about to be compiled.
+        2. Prepend the `$PBExportHeader$<entry_name>.<ext>` line if
+           `syntax` does not already start with it. Export does not emit
+           this header but import requires it, so the asymmetry is
+           absorbed here.
+        3. Compile + import the syntax into `lib_path` via
+           `compile_entry_import`. Returns the same `(success, errors)`
+           tuple as the underlying call.
+
+        `source_path` is taken as-is; the caller is responsible for
+        choosing the right location (usually
+        `<workspace>/ws_objects/<lib>.pbl.src/<entry_name>.<ext>`).
+        Parent directories must already exist.
+
+        The `<ext>` used in the auto-prepended header is derived from
+        `entry_type` via `extension_for_entry_type`. If the entry type
+        has no canonical extension (`project`, `proxyobject`, `binary`),
+        a `ValueError` is raised before any side-effect.
+        """
+        # Resolve the extension early so a bad entry_type fails fast,
+        # before we touch the filesystem.
+        ext = extension_for_entry_type(entry_type)
+
+        # Prepend the export header if missing. PB's compiler trims any
+        # leading whitespace, so the comparison is on the first
+        # non-blank chunk.
+        header_marker = "$PBExportHeader$"
+        if not syntax.lstrip().startswith(header_marker):
+            syntax = f"{header_marker}{entry_name}.{ext}\n{syntax}"
+
+        # Normalize line endings to CRLF, encode as UTF-16 LE with BOM.
+        normalized = syntax.replace("\r\n", "\n").replace("\r", "\n")
+        crlf = normalized.replace("\n", "\r\n")
+        payload = b"\xff\xfe" + crlf.encode("utf-16-le")
+
+        # Atomic write: use a temp file alongside the target, then rename.
+        # On Windows, os.replace is atomic for same-volume renames.
+        src = pathlib.Path(source_path)
+        tmp = src.with_suffix(src.suffix + ".tmp")
+        tmp.write_bytes(payload)
+        os.replace(tmp, src)
+
+        # Hand off to the existing import — passes the post-normalization
+        # `crlf` string (matches what's now on disk).
+        return self.compile_entry_import(
+            lib_path, entry_name, entry_type, crlf, comments
+        )
 
     def compile_entry_regenerate(
         self, lib_path: str, entry_name: str, entry_type: str

@@ -9,6 +9,12 @@ Tools exposed:
   `message_number`, `message_text`, `column`, `line`.
 - `pb_compile_entry_import_list(items)`: batch import. `items` is a list of
   dicts with the same keys as the single-entry call.
+- `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path,
+  comments="")`: atomic write-then-import. Persists `syntax` to
+  `source_path` in canonical PB encoding (UTF-16 LE BOM + CRLF), auto-prepends
+  the `$PBExportHeader$<entry_name>.<ext>` line if missing, then imports.
+  Single tool call instead of the three-step "edit + re-encode + import"
+  pattern. Same response shape as `pb_compile_entry_import`.
 - `pb_application_rebuild(rebuild_type)`: full/incremental/migrate/3pass
   rebuild of the current application. Requires `pb_session_open` +
   `pb_set_library_list` + `pb_set_current_application` first.
@@ -54,6 +60,50 @@ def pb_compile_entry_import(
         "lib_path": lib_path,
         "entry_name": entry_name,
         "entry_type": entry_type,
+        "errors": errors,
+    }
+
+
+def pb_edit_and_import(
+    lib_path: str,
+    entry_name: str,
+    entry_type: str,
+    syntax: str,
+    source_path: str,
+    comments: str = "",
+) -> dict[str, Any]:
+    """Atomic write-then-import for a PowerBuilder entry source.
+
+    Persists `syntax` to `source_path` on disk in canonical PB encoding
+    (UTF-16 LE BOM + CRLF), auto-prepends `$PBExportHeader$<entry_name>.<ext>`
+    if not already present, and then imports the syntax into `lib_path`.
+    Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
+    to UTF-16 + agent calls pb_compile_entry_import" pattern with a single
+    call.
+
+    Parent directories of `source_path` must already exist. The caller
+    chooses the location (usually
+    `<workspace>/ws_objects/<lib>.pbl.src/<entry_name>.<ext>`).
+    """
+    session = Session.instance()
+    try:
+        success, errors = session.edit_and_import(
+            lib_path, entry_name, entry_type, syntax, source_path, comments
+        )
+    except SessionStateError as exc:
+        return _error("PB_ORCA_MCP_STATEERROR", str(exc))
+    except ValueError as exc:
+        return _error("PB_ORCA_MCP_INVALIDARGS", str(exc))
+    except OSError as exc:
+        return _error("PB_ORCA_MCP_IOERROR", str(exc))
+    except OrcaError as exc:
+        return {"error": exc.to_dict(), "errors": session.last_compile_errors}
+    return {
+        "success": success,
+        "lib_path": lib_path,
+        "entry_name": entry_name,
+        "entry_type": entry_type,
+        "source_path": source_path,
         "errors": errors,
     }
 

@@ -138,6 +138,40 @@ def entry_type_from_name(name: str) -> int:
         raise ValueError(f"unknown entry type {name!r}; valid: {valid}") from exc
 
 
+# On-disk source-file extension for each entry type. Convention from the
+# PB IDE / SCC export: `<entry_name>.<extension>` placed under the
+# `<lib>.pbl.src/` directory parallel to the `.pbl`.
+ENTRY_TYPE_EXTENSIONS: dict[str, str] = {
+    "application": "sra",
+    "datawindow": "srd",
+    "function": "srf",
+    "menu": "srm",
+    "pipeline": "srp",
+    "query": "srq",
+    "structure": "srs",
+    "userobject": "sru",
+    "window": "srw",
+}
+
+
+def extension_for_entry_type(name: str) -> str:
+    """Return the canonical `.sr*` extension for an entry type name.
+
+    Used to construct the `$PBExportHeader$<entry_name>.<ext>` line that
+    `PBORCA_CompileEntryImport` expects. Raises `ValueError` for types
+    that have no on-disk source representation (`project`, `proxyobject`,
+    `binary`).
+    """
+    try:
+        return ENTRY_TYPE_EXTENSIONS[name.lower()]
+    except KeyError as exc:
+        raise ValueError(
+            f"entry type {name!r} has no canonical .sr* extension "
+            f"(only sources types have one: "
+            f"{', '.join(sorted(ENTRY_TYPE_EXTENSIONS))})"
+        ) from exc
+
+
 # Rebuild types (`enum pborca_rebuild_type` in PBORCA.H).
 PBORCA_FULL_REBUILD = 0
 PBORCA_INCREMENTAL_REBUILD = 1

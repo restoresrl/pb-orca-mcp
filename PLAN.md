@@ -105,6 +105,7 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | `pb_library_comment_modify` | `PBORCA_LibraryCommentModify` | Modifica il commento della PBL stessa |
 | `pb_compile_entry_import` | `PBORCA_CompileEntryImport` | Singola entry da source file |
 | `pb_compile_entry_import_list` | `PBORCA_CompileEntryImportList` | Batch import + compile |
+| `pb_edit_and_import` | (wraps `PBORCA_CompileEntryImport`) | Write `.sr*` su disco (UTF-16 LE BOM + CRLF, header auto) + import atomico — sostituisce la sequenza edit+re-encode+import a 3 step |
 | `pb_application_rebuild` | `PBORCA_ApplicationRebuild` | Full/incremental/migrate (sostituisce `BuildProject*` deprecati in R3) |
 | `pb_executable_create` | `PBORCA_ExecutableCreate` | Build EXE, con PBR/icon/flag machine code |
 | `pb_dynamic_library_create` | `PBORCA_DynamicLibraryCreate` | Build PBD da una PBL |
