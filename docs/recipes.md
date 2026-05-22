@@ -118,11 +118,19 @@ What the tool does atomically:
 
 1. Resolves the on-disk extension from `entry_type` (`function` → `srf`,
    `userobject` → `sru`, etc.).
-2. Prepends `$PBExportHeader$f_compute_total.srf\r\n` to `syntax` if
-   it's not already there.
-3. Writes the resulting text to `source_path` in UTF-16 LE BOM + CRLF
-   (via temp file + atomic rename on the same volume).
-4. Calls `PBORCA_CompileEntryImport` with the same text.
+2. Strips any caller-supplied `$PBExportHeader$` / `$PBExportComments$`
+   from `syntax`, then rebuilds the canonical header block:
+   `$PBExportHeader$f_compute_total.srf\r\n` plus (if `comments` is
+   non-empty) `$PBExportComments$<escaped>\r\n` with PowerScript
+   escapes (`~r~n`, `~r`, `~n`, `~t`, `~~`) and CRLF normalization on
+   the comment.
+3. Writes the resulting text to `source_path` with the encoding
+   selected by `source_encoding` (default `"UTF-8"` → UTF-8 BOM; also
+   accepts `"UTF-16BOM"` and `"ANSI"` — match the workspace `.pbw`
+   `DefaultExportEncode`), CRLF endings (via temp file + atomic rename
+   on the same volume).
+4. Calls `PBORCA_CompileEntryImport` with `$PBExportHeader$` + body
+   (comment metadata travels via the separate `comments` parameter).
 5. Returns the unified `{success, errors}` plus the input echo.
 
 Failure modes:

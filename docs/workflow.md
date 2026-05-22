@@ -170,27 +170,53 @@ There is no text file to edit on disk; everything happens in memory.
 
 ### Editing `.sr*` source files — encoding caveat
 
-PB source files (`.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`) are **UTF-16 LE
-with BOM** (`FF FE`) and **CRLF** line endings. ORCA (and PB IDE itself)
-refuse to parse them in any other encoding.
+PB IDE picks the encoding of `.sr*` files on disk from the workspace
+`.pbw` `DefaultExportEncode` directive, which takes one of three values:
 
-Most host editors and CLI write tools default to UTF-8 with LF when they
-save text files — so a naïve "edit the `.srw` and refresh" round-trip can
-silently downgrade the file to **UTF-8 BOM** (`EF BB BF`), at which point
-`pb_scc_refresh_target` and `pb_compile_entry_import` fail. After any host
-edit on a `.sr*` file, reconvert before the refresh:
+| Value | First bytes | Notes |
+|---|---|---|
+| `"UTF-8"` | `EF BB BF` | PB 2022 default. Observed across the whole Restore stack surveyed. |
+| `"UTF-16BOM"` | `FF FE` | PB legacy default (pre-2019). |
+| `"ANSI"` | (no BOM) | Older Windows workspaces, system codepage. |
+
+All three use **CRLF** line endings. On read (Refresh, Import) PB
+detects via BOM and accepts any of the three; on write (Export, IDE
+Refresh + Regenerate, SCC-driven regen) PB emits in the configured
+encoding. An agent that writes the wrong one creates a phantom-diff
+cascade — PB re-exports the file on the next Refresh.
+
+Most host editors and CLI write tools default to UTF-8 no-BOM with LF
+when they save text files — so a naïve "edit the `.srw` and refresh"
+round-trip can silently strip the BOM or flip line endings, at which
+point `pb_scc_refresh_target` and `pb_compile_entry_import` fail.
+After any host edit on a `.sr*` file, reconvert before the refresh,
+matching the workspace setting:
 
 ```powershell
 $path = "...\<file>.srw"
 $content = Get-Content -Raw -Path $path -Encoding UTF8
 $content = $content -replace "`r`n","`n" -replace "`n","`r`n"   # normalize to CRLF
+
+# Pick ONE based on the .pbw DefaultExportEncode:
+# UTF-8 BOM (PB 2022 default):
+[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($true))
+# UTF-16 LE BOM:
 [System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode)
+# ANSI (no BOM, system codepage):
+[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Default)
 ```
 
-`[System.Text.Encoding]::Unicode` in .NET is UTF-16 LE BOM (despite the
-misleading name). After conversion the first 2 bytes should be `FF FE`
-and the file roughly doubles in size. Validated 2026-05-13 on a window
-edit smoke test.
+After conversion, verify the first bytes match the target BOM (or the
+absence of one for ANSI). Validated 2026-05-22 against PB 22.0 on a
+clean `test-mcp` workspace.
+
+**Recommended alternative**: avoid the manual re-encode step entirely
+by calling `pb_edit_and_import` with the matching `source_encoding`
+parameter — the tool writes the file with the right BOM + codec,
+rebuilds the canonical `$PBExportHeader$` / `$PBExportComments$`
+header block (PowerScript-escape with CRLF normalization), and
+imports atomically. Single tool call instead of edit + re-encode +
+import.
 
 ### Passing large `syntax` strings
 

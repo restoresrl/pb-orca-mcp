@@ -43,18 +43,22 @@ proof that on git projects the textual form is canonical.
 
 4. Read the file you just edited and propagate to the `.pbl`.
 
-   **Preferred (single tool call)** — `pb_edit_and_import` does the
-   on-disk SOT write (UTF-16 LE BOM + CRLF + `$PBExportHeader$` auto-
-   prepended) plus the `.pbl` import atomically:
+   **Preferred (single tool call)** — `pb_edit_and_import` writes the
+   SOT file with the workspace `DefaultExportEncode` (UTF-8 BOM by
+   default, UTF-16BOM or ANSI on demand) + CRLF, rebuilds the
+   canonical header block (`$PBExportHeader$` plus `$PBExportComments$`
+   when `comments` is non-empty, with PowerScript-escaped CRLF-
+   normalized content), and imports atomically:
 
    ```jsonc
    pb_edit_and_import {
-     "lib_path":    "...\\src\\<lib>.pbl",
-     "entry_name":  "<entry>",
-     "entry_type":  "<userobject|function|window|application|...>",
-     "syntax":      "<edited body — header optional>",
-     "source_path": "...\\ws_objects\\<lib>.pbl.src\\<entry>.<ext>",
-     "comments":    "optional commit-style message"
+     "lib_path":         "...\\src\\<lib>.pbl",
+     "entry_name":       "<entry>",
+     "entry_type":       "<userobject|function|window|application|...>",
+     "syntax":           "<edited body — header optional>",
+     "source_path":      "...\\ws_objects\\<lib>.pbl.src\\<entry>.<ext>",
+     "comments":         "optional commit-style message",
+     "source_encoding":  "UTF-8"   // match the .pbw DefaultExportEncode
    }
    ```
 
@@ -63,7 +67,8 @@ proof that on git projects the textual form is canonical.
 
    ```jsonc
    // (4a) The agent edits the .sr* file via host tools.
-   // (4b) Re-encode UTF-8 -> UTF-16 LE BOM (see "Pitfalls" below).
+   // (4b) Re-encode the file to match the workspace DefaultExportEncode
+   //      (UTF-8 BOM by default — see "Pitfalls" below).
    // (4c) Then call pb_compile_entry_import directly:
    pb_compile_entry_import {
      "lib_path": "...\\src\\<lib>.pbl",
@@ -130,19 +135,25 @@ The `.pbl` is canonical. Work in memory.
   with your host tools; ORCA's job is the `.pbl`. **Mitigation**: use
   `pb_edit_and_import` instead — it writes the SOT file and imports
   in a single atomic call.
-- **Edit tools may flip `.sr*` files from UTF-16 LE BOM to UTF-8 BOM**
-  on save. PB rejects the converted file. After any host-tool edit on
-  a `.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`, reconvert with PowerShell:
-  `[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::Unicode)`
-  (the .NET name "Unicode" is UTF-16 LE BOM). First 2 bytes should be
-  `FF FE`. See `docs/workflow.md` "Encoding caveat" for details.
-  **Mitigation**: use `pb_edit_and_import` — it writes UTF-16 LE BOM
-  + CRLF natively, no host-tool round-trip involved.
+- **Edit tools may flip `.sr*` files to UTF-8 no-BOM or LF on save**,
+  or change the BOM away from the workspace `DefaultExportEncode`.
+  PB rejects the file or re-exports it on the next Refresh
+  (encoding-mismatch cascade). After any host-tool edit on a
+  `.sra`/`.srf`/`.srw`/`.srm`/`.sru`/`.srd`, reconvert with PowerShell
+  using the codec that matches the workspace `.pbw`:
+  `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($true))`
+  for UTF-8 BOM, `[System.Text.Encoding]::Unicode` for UTF-16 LE BOM,
+  `[System.Text.Encoding]::Default` for ANSI. See `docs/workflow.md`
+  "Encoding caveat" for details. **Mitigation**: use
+  `pb_edit_and_import` with the matching `source_encoding` parameter —
+  it writes the right BOM + codec natively, no host-tool round-trip.
 - **Export/import asymmetry**: `pb_library_entry_export` returns the
-  body only; `pb_compile_entry_import` requires `$PBExportHeader$<name>.<ext>`
-  as the first line of `syntax`. Re-prepend it manually for round-trips.
-  **Mitigation**: `pb_edit_and_import` prepends the header
-  automatically when missing.
+  body only (no `$PBExportHeader$`, no `$PBExportComments$`);
+  `pb_compile_entry_import` requires `$PBExportHeader$<name>.<ext>`
+  as the first line of `syntax`. Re-prepend it manually for round-
+  trips. **Mitigation**: `pb_edit_and_import` rebuilds the canonical
+  header block (header + comments line + PowerScript-escaped CRLF-
+  normalized comment) automatically.
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically.
   Always check `git status` and revert unless you added a target.
 
