@@ -66,7 +66,7 @@ usable from the current Python interpreter.
 
 ## What it exposes
 
-Every function in ORCA's public API is mapped to one MCP tool. 29 tools
+Every function in ORCA's public API is mapped to one MCP tool. 30 tools
 total, grouped:
 
 | Group | Tools |
@@ -74,7 +74,7 @@ total, grouped:
 | Discovery | `pb_discover_pb_install`, `pb_target_info` |
 | Session | `pb_session_open`, `pb_session_close`, `pb_set_current_application`, `pb_set_library_list` |
 | Library | `pb_library_create`, `pb_library_delete`, `pb_library_directory`, `pb_library_entry_information`, `pb_library_entry_export`, `pb_library_entry_delete`, `pb_library_entry_move`, `pb_library_comment_modify` |
-| Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
+| Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_edit_and_import`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
 | Build | `pb_executable_create`, `pb_dynamic_library_create` |
 | Query | `pb_object_query_hierarchy`, `pb_object_query_reference`, `pb_object_regenerate` |
 | SCC | `pb_scc_connect_offline`, `pb_scc_set_target`, `pb_scc_refresh_target`, `pb_scc_exclude_library_list`, `pb_scc_get_connect_properties`, `pb_scc_close` |

@@ -50,15 +50,16 @@ def test_cli_doctor_runs_to_completion() -> None:
     assert "Python:" in result.output
 
 
-def test_server_exposes_29_tools() -> None:
+def test_server_exposes_all_tools() -> None:
     """Every PLAN tool is wired through to the MCP server.
 
-    23 v0.1.0 tools + 6 SCC offline-mode tools = 29.
+    Current count: 24 core tools + 6 SCC offline-mode tools = 30.
+    Bump the expected count when adding/removing a tool.
     """
     from pb_orca_mcp.server import tool_names
 
     names = tool_names()
-    assert len(names) == 29
+    assert len(names) == 30
     # Anchor a few names so a rename or accidental drop fails loudly.
     assert "pb_discover_pb_install" in names
     assert "pb_compile_entry_import" in names
