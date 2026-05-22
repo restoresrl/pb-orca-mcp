@@ -11,10 +11,15 @@ Tools exposed:
   dicts with the same keys as the single-entry call.
 - `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path,
   comments="")`: atomic write-then-import. Persists `syntax` to
-  `source_path` in canonical PB encoding (UTF-16 LE BOM + CRLF), auto-prepends
-  the `$PBExportHeader$<entry_name>.<ext>` line if missing, then imports.
-  Single tool call instead of the three-step "edit + re-encode + import"
-  pattern. Same response shape as `pb_compile_entry_import`.
+  `source_path` in canonical PB encoding (UTF-16 LE BOM + CRLF), rebuilds
+  the PB IDE export header block (`$PBExportHeader$<entry_name>.<ext>`
+  on line 1, plus `$PBExportComments$<escaped>` on line 2 when
+  `comments` is non-empty — PowerScript escape, e.g. CRLF → `~r~n`),
+  then imports. Single tool call instead of the three-step "edit +
+  re-encode + import" pattern. Same response shape as
+  `pb_compile_entry_import`. Writing the `$PBExportComments$` line is
+  what keeps the on-disk `.sru` byte-identical to PB IDE's own export
+  — without it the IDE triggers a refresh + regenerate cascade.
 - `pb_application_rebuild(rebuild_type)`: full/incremental/migrate/3pass
   rebuild of the current application. Requires `pb_session_open` +
   `pb_set_library_list` + `pb_set_current_application` first.
@@ -75,8 +80,13 @@ def pb_edit_and_import(
     """Atomic write-then-import for a PowerBuilder entry source.
 
     Persists `syntax` to `source_path` on disk in canonical PB encoding
-    (UTF-16 LE BOM + CRLF), auto-prepends `$PBExportHeader$<entry_name>.<ext>`
-    if not already present, and then imports the syntax into `lib_path`.
+    (UTF-16 LE BOM + CRLF), rebuilds the canonical PB IDE export header
+    block (`$PBExportHeader$<entry_name>.<ext>` on line 1, plus
+    `$PBExportComments$<escaped>` on line 2 when `comments` is non-empty,
+    using PowerScript escape sequences such as `~r~n`), and then imports
+    the syntax into `lib_path`. Any caller-supplied `$PBExportHeader$` /
+    `$PBExportComments$` lines at the top of `syntax` are discarded —
+    `comments` is the single source of truth for entry comment metadata.
     Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
     to UTF-16 + agent calls pb_compile_entry_import" pattern with a single
     call.

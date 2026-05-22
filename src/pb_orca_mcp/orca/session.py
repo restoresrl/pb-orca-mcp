@@ -73,6 +73,42 @@ def _strip_buffer(buf: Any) -> str:
     return str(buf).rstrip("\x00") if not isinstance(buf, str) else buf.rstrip("\x00")
 
 
+def _escape_pb_comment(text: str) -> str:
+    """PowerScript-escape special chars for the `$PBExportComments$` inline format.
+
+    PB IDE serializes multi-line / control-character entry comments on a
+    single `$PBExportComments$` line using PowerScript escape sequences
+    (verified empirically against PB 22.0: a comment storing CRLF in
+    PBL metadata exports as `~r~n`). The `~` escape must be applied
+    first to avoid double-escaping.
+    """
+    return (
+        text.replace("~", "~~")
+        .replace("\r", "~r")
+        .replace("\n", "~n")
+        .replace("\t", "~t")
+    )
+
+
+def _strip_export_headers(syntax: str) -> str:
+    """Drop a leading `$PBExportHeader$` and any `$PBExportComments$` continuation.
+
+    The first two non-blank lines of `syntax` are inspected; any matching
+    line is removed so the caller can rebuild the canonical header
+    block from scratch. The `comments` parameter is the single source
+    of truth for entry comment metadata — a `$PBExportComments$` line
+    already present in `syntax` would be discarded.
+    """
+    text = syntax.lstrip("\r\n")
+    if text.startswith("$PBExportHeader$"):
+        nl = text.find("\n")
+        text = text[nl + 1 :] if nl != -1 else ""
+    if text.startswith("$PBExportComments$"):
+        nl = text.find("\n")
+        text = text[nl + 1 :] if nl != -1 else ""
+    return text
+
+
 class SessionStateError(RuntimeError):
     """Raised when a session operation is invoked from the wrong state."""
 
@@ -433,10 +469,15 @@ class Session:
            encoding (UTF-16 LE BOM + CRLF). This keeps the workspace's
            SOT (`ws_objects/<lib>.pbl.src/<entry_name>.<ext>`) coherent
            with what's about to be compiled.
-        2. Prepend the `$PBExportHeader$<entry_name>.<ext>` line if
-           `syntax` does not already start with it. Export does not emit
-           this header but import requires it, so the asymmetry is
-           absorbed here.
+        2. Rebuild the canonical PB IDE export header block:
+           `$PBExportHeader$<entry_name>.<ext>` on line 1, and — if
+           `comments` is non-empty — `$PBExportComments$<escaped>` on
+           line 2, using PowerScript escape sequences (`~r~n` for CRLF,
+           `~r` for CR, `~n` for LF, `~~` for `~`). Any existing
+           `$PBExportHeader$` / `$PBExportComments$` lines at the top of
+           `syntax` are stripped before rebuild — `comments` is the
+           single source of truth. Export does not emit these headers
+           but import requires them, so the asymmetry is absorbed here.
         3. Compile + import the syntax into `lib_path` via
            `compile_entry_import`. Returns the same `(success, errors)`
            tuple as the underlying call.
@@ -450,22 +491,32 @@ class Session:
         `entry_type` via `extension_for_entry_type`. If the entry type
         has no canonical extension (`project`, `proxyobject`, `binary`),
         a `ValueError` is raised before any side-effect.
+
+        Writing the `$PBExportComments$` line is what keeps the on-disk
+        `.sru` byte-identical to PB IDE's own export. Without it, PB IDE
+        sees the file as out-of-sync with the PBL on the next Refresh
+        and triggers an import + compile + regenerate cascade.
         """
         # Resolve the extension early so a bad entry_type fails fast,
         # before we touch the filesystem.
         ext = extension_for_entry_type(entry_type)
 
-        # Prepend the export header if missing. PB's compiler trims any
-        # leading whitespace, so the comparison is on the first
-        # non-blank chunk.
-        header_marker = "$PBExportHeader$"
-        if not syntax.lstrip().startswith(header_marker):
-            syntax = f"{header_marker}{entry_name}.{ext}\n{syntax}"
+        # Strip any caller-supplied $PBExportHeader$ / $PBExportComments$
+        # so we can rebuild the canonical header block from scratch.
+        body = _strip_export_headers(syntax)
 
-        # Normalize line endings to CRLF, encode as UTF-16 LE with BOM.
-        normalized = syntax.replace("\r\n", "\n").replace("\r", "\n")
-        crlf = normalized.replace("\n", "\r\n")
-        payload = b"\xff\xfe" + crlf.encode("utf-16-le")
+        # Build the canonical PB IDE export header block.
+        header_lines = [f"$PBExportHeader${entry_name}.{ext}"]
+        if comments:
+            header_lines.append(f"$PBExportComments${_escape_pb_comment(comments)}")
+        header_block = "\r\n".join(header_lines) + "\r\n"
+
+        # Normalize body line endings to CRLF, prepend header block,
+        # encode as UTF-16 LE with BOM.
+        body_lf = body.replace("\r\n", "\n").replace("\r", "\n")
+        body_crlf = body_lf.replace("\n", "\r\n")
+        disk_text = header_block + body_crlf
+        payload = b"\xff\xfe" + disk_text.encode("utf-16-le")
 
         # Atomic write: use a temp file alongside the target, then rename.
         # On Windows, os.replace is atomic for same-volume renames.
@@ -474,10 +525,13 @@ class Session:
         tmp.write_bytes(payload)
         os.replace(tmp, src)
 
-        # Hand off to the existing import — passes the post-normalization
-        # `crlf` string (matches what's now on disk).
+        # Hand off to the existing import. Pass only $PBExportHeader$ +
+        # body to ORCA — the comment metadata travels via the separate
+        # `comments` parameter, so omitting $PBExportComments$ from the
+        # syntax avoids any ambiguity about which value wins.
+        orca_syntax = f"$PBExportHeader${entry_name}.{ext}\r\n" + body_crlf
         return self.compile_entry_import(
-            lib_path, entry_name, entry_type, crlf, comments
+            lib_path, entry_name, entry_type, orca_syntax, comments
         )
 
     def compile_entry_regenerate(

@@ -251,9 +251,23 @@ Batch version. `items` is a list of dicts:
 ### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="")`
 
 Atomic write-then-import. Persists `syntax` to `source_path` on disk in
-canonical PB encoding (UTF-16 LE BOM + CRLF), auto-prepends the
-`$PBExportHeader$<entry_name>.<ext>` first line if not already present,
-and then imports `syntax` into `lib_path`.
+canonical PB encoding (UTF-16 LE BOM + CRLF), rebuilds the canonical PB
+IDE export header block, and then imports `syntax` into `lib_path`.
+
+The header block is reconstructed from scratch on every call:
+
+- Line 1: `$PBExportHeader$<entry_name>.<ext>`
+- Line 2 (only when `comments` is non-empty):
+  `$PBExportComments$<escaped>` where `<escaped>` applies PowerScript
+  escape sequences to control characters — `~r` for CR, `~n` for LF
+  (so a CRLF-bearing comment becomes `…~r~n…`), `~t` for TAB, and
+  `~~` for `~` itself. This matches PB IDE's own export format byte
+  for byte, so the IDE's next Refresh on the entry is a no-op rather
+  than triggering an import + compile + regenerate cascade.
+
+Any `$PBExportHeader$` / `$PBExportComments$` lines the caller leaves
+at the top of `syntax` are stripped before rebuild — the `comments`
+parameter is the single source of truth for entry comment metadata.
 
 Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
 to UTF-16 + agent calls `pb_compile_entry_import`" pattern with a
