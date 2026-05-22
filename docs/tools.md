@@ -248,7 +248,7 @@ Batch version. `items` is a list of dicts:
 ]
 ```
 
-### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="", source_encoding="UTF-8")`
+### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="", source_encoding="UTF-8", format="auto")`
 
 Atomic write-then-import. Persists `syntax` to `source_path` on disk
 with the encoding PB IDE writes for the workspace, rebuilds the
@@ -309,8 +309,23 @@ without a canonical source extension (`project`, `proxyobject`,
 atomic (temp-file + replace on the same volume). On filesystem error
 the tool returns `PB_ORCA_MCP_IOERROR`.
 
+The optional `format` parameter (`"auto"` / `True` / `False`,
+default `"auto"`) controls the PowerScript body normalizer. In
+`"auto"` mode the tool walks up from `source_path` looking for a
+`.pb-format.toml`; when found, it normalizes the body (indent,
+keyword case, operator spacing, line endings) before writing. With
+no config file in any ancestor directory, behaviour is identical to
+the pre-formatter contract. `True` forces the normalizer on with
+defaults if no config is discovered; `False` skips it entirely.
+DataWindow entries and entry types without a `.sr*` extension are
+always skipped regardless of `format`. A malformed `.pb-format.toml`
+surfaces as `PB_ORCA_MCP_INVALIDARGS` before any disk side-effect.
+See [`formatter.md`](formatter.md) for the schema and the four
+invariants.
+
 **Output**: `{"success", "lib_path", "entry_name", "entry_type",
-"source_path", "errors": [...]}`.
+"source_path", "formatted", "errors": [...]}`. `formatted` is `true`
+when the body was normalized, `false` otherwise.
 
 ### `pb_application_rebuild(rebuild_type="incremental")`
 
