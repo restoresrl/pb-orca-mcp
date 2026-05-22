@@ -13,6 +13,7 @@ import pytest
 from pb_orca_mcp.orca.session import (
     _encode_for_disk,
     _escape_pb_comment,
+    _normalize_pb_comment_newlines,
     _strip_export_headers,
 )
 
@@ -108,6 +109,32 @@ class TestStripExportHeaders:
 )
 def test_escape_pb_comment_parametric(raw: str, expected: str) -> None:
     assert _escape_pb_comment(raw) == expected
+
+
+class TestNormalizePbCommentNewlines:
+    """`_normalize_pb_comment_newlines` brings any newline style to CRLF."""
+
+    def test_empty_string_unchanged(self) -> None:
+        assert _normalize_pb_comment_newlines("") == ""
+
+    def test_plain_text_unchanged(self) -> None:
+        assert _normalize_pb_comment_newlines("hello world") == "hello world"
+
+    def test_lf_becomes_crlf(self) -> None:
+        # The case that surfaces when a comment is passed through JSON
+        # or an XML tool call — newlines collapse to bare LF.
+        assert _normalize_pb_comment_newlines("a\nb\nc") == "a\r\nb\r\nc"
+
+    def test_cr_becomes_crlf(self) -> None:
+        # Classic Mac style — uncommon but should normalize too.
+        assert _normalize_pb_comment_newlines("a\rb\rc") == "a\r\nb\r\nc"
+
+    def test_crlf_preserved(self) -> None:
+        # Already-Windows newlines must not be doubled.
+        assert _normalize_pb_comment_newlines("a\r\nb\r\nc") == "a\r\nb\r\nc"
+
+    def test_mixed_normalizes_uniformly(self) -> None:
+        assert _normalize_pb_comment_newlines("a\nb\rc\r\nd") == "a\r\nb\r\nc\r\nd"
 
 
 class TestEncodeForDisk:

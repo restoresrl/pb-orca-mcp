@@ -279,9 +279,14 @@ The header block is reconstructed from scratch on every call:
   `$PBExportComments$<escaped>` where `<escaped>` applies PowerScript
   escape sequences to control characters — `~r` for CR, `~n` for LF
   (so a CRLF-bearing comment becomes `…~r~n…`), `~t` for TAB, and
-  `~~` for `~` itself. This matches PB IDE's own export format byte
-  for byte, so the IDE's next Refresh on the entry is a no-op rather
-  than triggering an import + compile + regenerate cascade.
+  `~~` for `~` itself. Before escape, the `comments` string is
+  normalized so every newline style (CRLF / LF / CR) is stored as
+  CRLF; otherwise the Library Painter Properties dialog would render
+  bare LF without a visible line break (Windows multi-line edit
+  control behavior). The end result matches PB IDE's own export
+  format byte for byte, so the IDE's next Refresh on the entry is a
+  no-op rather than triggering an import + compile + regenerate
+  cascade.
 
 Any `$PBExportHeader$` / `$PBExportComments$` lines the caller leaves
 at the top of `syntax` are stripped before rebuild — the `comments`

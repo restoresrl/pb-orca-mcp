@@ -101,6 +101,21 @@ def _encode_for_disk(text: str, encoding: str) -> bytes:
     return bom + text.encode(codec)
 
 
+def _normalize_pb_comment_newlines(text: str) -> str:
+    """Normalize any newline style (CRLF / LF / CR) to CRLF.
+
+    PB IDE on Windows expects CRLF in entry comment metadata: the
+    Library Painter Properties dialog uses a multi-line Windows edit
+    control that renders bare LF without a visible line break. Storing
+    CRLF (and serializing as `~r~n` in the inline `$PBExportComments$`
+    format) round-trips through PB IDE with correct line-break
+    rendering.
+    """
+    if not text:
+        return text
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+
+
 def _escape_pb_comment(text: str) -> str:
     """PowerScript-escape special chars for the `$PBExportComments$` inline format.
 
@@ -511,11 +526,17 @@ class Session:
            `$PBExportHeader$<entry_name>.<ext>` on line 1, and — if
            `comments` is non-empty — `$PBExportComments$<escaped>` on
            line 2, using PowerScript escape sequences (`~r~n` for CRLF,
-           `~r` for CR, `~n` for LF, `~~` for `~`). Any existing
-           `$PBExportHeader$` / `$PBExportComments$` lines at the top of
-           `syntax` are stripped before rebuild — `comments` is the
-           single source of truth. Export does not emit these headers
-           but import requires them, so the asymmetry is absorbed here.
+           `~r` for CR, `~n` for LF, `~~` for `~`). The `comments`
+           string is normalized to CRLF newlines before being stored
+           in the PBL and before being escaped, so a multi-line comment
+           passed as bare LF survives a round-trip through PB IDE: the
+           Library Painter Properties dialog needs CRLF to render a
+           visible line break, and `~r~n` is what PB IDE itself emits.
+           Any existing `$PBExportHeader$` / `$PBExportComments$` lines
+           at the top of `syntax` are stripped before rebuild — `comments`
+           is the single source of truth. Export does not emit these
+           headers but import requires them, so the asymmetry is
+           absorbed here.
         3. Compile + import the syntax into `lib_path` via
            `compile_entry_import`. Returns the same `(success, errors)`
            tuple as the underlying call.
@@ -551,10 +572,14 @@ class Session:
         # so we can rebuild the canonical header block from scratch.
         body = _strip_export_headers(syntax)
 
+        # Normalize comment newlines to CRLF before storing and
+        # escaping (see `_normalize_pb_comment_newlines`).
+        normalized_comments = _normalize_pb_comment_newlines(comments)
+
         # Build the canonical PB IDE export header block.
         header_lines = [f"$PBExportHeader${entry_name}.{ext}"]
-        if comments:
-            header_lines.append(f"$PBExportComments${_escape_pb_comment(comments)}")
+        if normalized_comments:
+            header_lines.append(f"$PBExportComments${_escape_pb_comment(normalized_comments)}")
         header_block = "\r\n".join(header_lines) + "\r\n"
 
         # Normalize body line endings to CRLF, prepend header block,
@@ -580,7 +605,7 @@ class Session:
         # representation.
         orca_syntax = f"$PBExportHeader${entry_name}.{ext}\r\n" + body_crlf
         return self.compile_entry_import(
-            lib_path, entry_name, entry_type, orca_syntax, comments
+            lib_path, entry_name, entry_type, orca_syntax, normalized_comments
         )
 
     def compile_entry_regenerate(
