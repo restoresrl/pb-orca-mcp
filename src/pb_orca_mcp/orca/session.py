@@ -73,6 +73,34 @@ def _strip_buffer(buf: Any) -> str:
     return str(buf).rstrip("\x00") if not isinstance(buf, str) else buf.rstrip("\x00")
 
 
+# Source-file encoding values accepted by PB IDE in the `.pbw`
+# `DefaultExportEncode` setting, mapped to (bom_bytes, python_codec).
+# `mbcs` resolves to the system's Windows ANSI codepage at runtime
+# (e.g. 1252 on Italian Windows), matching PB IDE's ANSI export.
+_PBW_ENCODINGS: dict[str, tuple[bytes, str]] = {
+    "UTF-8": (b"\xef\xbb\xbf", "utf-8"),
+    "UTF-16BOM": (b"\xff\xfe", "utf-16-le"),
+    "ANSI": (b"", "mbcs"),
+}
+
+
+def _encode_for_disk(text: str, encoding: str) -> bytes:
+    """Encode `text` with the BOM + codec PB IDE uses for that `.pbw` setting.
+
+    `encoding` must be one of the three values PB writes in the
+    `DefaultExportEncode` directive of a `.pbw` file: `"UTF-8"`,
+    `"UTF-16BOM"`, `"ANSI"`. Raises `ValueError` otherwise. Encoding
+    errors against the codepage (typical for `ANSI` when the text
+    contains characters outside the codepage) bubble up as
+    `UnicodeEncodeError`.
+    """
+    if encoding not in _PBW_ENCODINGS:
+        valid = ", ".join(sorted(_PBW_ENCODINGS))
+        raise ValueError(f"Unsupported source_encoding {encoding!r}; expected one of: {valid}")
+    bom, codec = _PBW_ENCODINGS[encoding]
+    return bom + text.encode(codec)
+
+
 def _escape_pb_comment(text: str) -> str:
     """PowerScript-escape special chars for the `$PBExportComments$` inline format.
 
@@ -460,15 +488,25 @@ class Session:
         syntax: str,
         source_path: str,
         comments: str = "",
+        source_encoding: str = "UTF-8",
     ) -> tuple[bool, list[dict[str, Any]]]:
         """Atomic write-then-import for a PowerBuilder entry source.
 
         Combines the three operations an agent normally has to chain:
 
-        1. Persist `syntax` to `source_path` on disk in the canonical PB
-           encoding (UTF-16 LE BOM + CRLF). This keeps the workspace's
-           SOT (`ws_objects/<lib>.pbl.src/<entry_name>.<ext>`) coherent
-           with what's about to be compiled.
+        1. Persist `syntax` to `source_path` on disk in the encoding
+           the PB IDE writes for that workspace. PB IDE picks the
+           encoding from the `DefaultExportEncode` directive in the
+           `.pbw`; the caller is expected to read that setting and
+           pass the matching `source_encoding` here (`"UTF-8"`,
+           `"UTF-16BOM"`, or `"ANSI"`). Default is `"UTF-8"` — the
+           value PB 2022 writes into a freshly-created workspace and
+           the value observed across every Restore workspace surveyed
+           (rstpb22, pbgettext22, pbunit22, mw21r2, all Magware
+           customizations). Writing the wrong encoding silently
+           triggers a cascade in PB IDE on the next Refresh because
+           the IDE re-exports the file in the workspace's configured
+           encoding, producing a "phantom" diff.
         2. Rebuild the canonical PB IDE export header block:
            `$PBExportHeader$<entry_name>.<ext>` on line 1, and — if
            `comments` is non-empty — `$PBExportComments$<escaped>` on
@@ -492,14 +530,22 @@ class Session:
         has no canonical extension (`project`, `proxyobject`, `binary`),
         a `ValueError` is raised before any side-effect.
 
-        Writing the `$PBExportComments$` line is what keeps the on-disk
-        `.sru` byte-identical to PB IDE's own export. Without it, PB IDE
-        sees the file as out-of-sync with the PBL on the next Refresh
-        and triggers an import + compile + regenerate cascade.
+        Writing the `$PBExportComments$` line and matching encoding is
+        what keeps the on-disk source byte-identical to PB IDE's own
+        export. Without either, PB IDE sees the file as out-of-sync
+        with the PBL on the next Refresh and triggers an import +
+        compile + regenerate cascade.
         """
         # Resolve the extension early so a bad entry_type fails fast,
         # before we touch the filesystem.
         ext = extension_for_entry_type(entry_type)
+        # Same for encoding — validates `source_encoding` against the
+        # three values PB IDE accepts.
+        if source_encoding not in _PBW_ENCODINGS:
+            valid = ", ".join(sorted(_PBW_ENCODINGS))
+            raise ValueError(
+                f"Unsupported source_encoding {source_encoding!r}; expected one of: {valid}"
+            )
 
         # Strip any caller-supplied $PBExportHeader$ / $PBExportComments$
         # so we can rebuild the canonical header block from scratch.
@@ -512,11 +558,11 @@ class Session:
         header_block = "\r\n".join(header_lines) + "\r\n"
 
         # Normalize body line endings to CRLF, prepend header block,
-        # encode as UTF-16 LE with BOM.
+        # encode with the requested workspace encoding.
         body_lf = body.replace("\r\n", "\n").replace("\r", "\n")
         body_crlf = body_lf.replace("\n", "\r\n")
         disk_text = header_block + body_crlf
-        payload = b"\xff\xfe" + disk_text.encode("utf-16-le")
+        payload = _encode_for_disk(disk_text, source_encoding)
 
         # Atomic write: use a temp file alongside the target, then rename.
         # On Windows, os.replace is atomic for same-volume renames.
@@ -528,7 +574,10 @@ class Session:
         # Hand off to the existing import. Pass only $PBExportHeader$ +
         # body to ORCA — the comment metadata travels via the separate
         # `comments` parameter, so omitting $PBExportComments$ from the
-        # syntax avoids any ambiguity about which value wins.
+        # syntax avoids any ambiguity about which value wins. ORCA
+        # itself is encoding-agnostic: the string crosses the C ABI as
+        # wide chars, so `source_encoding` only affects the on-disk
+        # representation.
         orca_syntax = f"$PBExportHeader${entry_name}.{ext}\r\n" + body_crlf
         return self.compile_entry_import(
             lib_path, entry_name, entry_type, orca_syntax, comments

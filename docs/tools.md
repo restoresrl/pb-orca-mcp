@@ -248,11 +248,29 @@ Batch version. `items` is a list of dicts:
 ]
 ```
 
-### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="")`
+### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="", source_encoding="UTF-8")`
 
-Atomic write-then-import. Persists `syntax` to `source_path` on disk in
-canonical PB encoding (UTF-16 LE BOM + CRLF), rebuilds the canonical PB
-IDE export header block, and then imports `syntax` into `lib_path`.
+Atomic write-then-import. Persists `syntax` to `source_path` on disk
+with the encoding PB IDE writes for the workspace, rebuilds the
+canonical PB IDE export header block, and then imports `syntax` into
+`lib_path`.
+
+`source_encoding` accepts one of the three values PB IDE writes in the
+`.pbw` `DefaultExportEncode` directive:
+
+- `"UTF-8"` — UTF-8 with BOM (`EF BB BF`). Default in PB 2022 and
+  observed across every Restore workspace surveyed.
+- `"UTF-16BOM"` — UTF-16 LE with BOM (`FF FE`). PB legacy default
+  pre-2019.
+- `"ANSI"` — system codepage, no BOM. Older Windows workspaces only.
+
+The caller should read `DefaultExportEncode` from the target's `.pbw`
+and pass the matching value. Mismatched encoding silently triggers a
+refresh cascade in PB IDE: the IDE re-exports the file using the
+workspace's configured encoding on the next Refresh, producing a
+"phantom" diff against what the tool wrote. ORCA itself is
+encoding-agnostic — strings cross the C ABI as wide chars — so
+`source_encoding` only affects the on-disk representation.
 
 The header block is reconstructed from scratch on every call:
 
@@ -269,10 +287,12 @@ Any `$PBExportHeader$` / `$PBExportComments$` lines the caller leaves
 at the top of `syntax` are stripped before rebuild — the `comments`
 parameter is the single source of truth for entry comment metadata.
 
-Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
-to UTF-16 + agent calls `pb_compile_entry_import`" pattern with a
-single call. Same response shape as `pb_compile_entry_import` plus
-`source_path` echoed back.
+Replaces the three-step "agent writes file + agent re-encodes + agent
+calls `pb_compile_entry_import`" pattern with a single call. Same
+response shape as `pb_compile_entry_import` plus `source_path` echoed
+back. A `UnicodeEncodeError` (text contains characters outside the
+chosen codepage, typically with `"ANSI"`) surfaces as
+`PB_ORCA_MCP_ENCODINGERROR`.
 
 The on-disk extension is derived from `entry_type` via the
 `ENTRY_TYPE_EXTENSIONS` map in `pb_orca_mcp.orca.constants` (`sru`,

@@ -10,16 +10,18 @@ Tools exposed:
 - `pb_compile_entry_import_list(items)`: batch import. `items` is a list of
   dicts with the same keys as the single-entry call.
 - `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path,
-  comments="")`: atomic write-then-import. Persists `syntax` to
-  `source_path` in canonical PB encoding (UTF-16 LE BOM + CRLF), rebuilds
-  the PB IDE export header block (`$PBExportHeader$<entry_name>.<ext>`
-  on line 1, plus `$PBExportComments$<escaped>` on line 2 when
-  `comments` is non-empty — PowerScript escape, e.g. CRLF → `~r~n`),
-  then imports. Single tool call instead of the three-step "edit +
-  re-encode + import" pattern. Same response shape as
-  `pb_compile_entry_import`. Writing the `$PBExportComments$` line is
-  what keeps the on-disk `.sru` byte-identical to PB IDE's own export
-  — without it the IDE triggers a refresh + regenerate cascade.
+  comments="", source_encoding="UTF-8")`: atomic write-then-import.
+  Persists `syntax` to `source_path` in the encoding PB IDE writes for
+  the workspace (`"UTF-8"` / `"UTF-16BOM"` / `"ANSI"` — match the
+  `.pbw` `DefaultExportEncode`), rebuilds the PB IDE export header
+  block (`$PBExportHeader$<entry_name>.<ext>` on line 1, plus
+  `$PBExportComments$<escaped>` on line 2 when `comments` is non-empty
+  — PowerScript escape, e.g. CRLF → `~r~n`), then imports. Single
+  tool call instead of the three-step "edit + re-encode + import"
+  pattern. Same response shape as `pb_compile_entry_import`. Writing
+  both the `$PBExportComments$` line and the matching encoding is what
+  keeps the on-disk source byte-identical to PB IDE's own export —
+  without either, the IDE triggers a refresh + regenerate cascade.
 - `pb_application_rebuild(rebuild_type)`: full/incremental/migrate/3pass
   rebuild of the current application. Requires `pb_session_open` +
   `pb_set_library_list` + `pb_set_current_application` first.
@@ -76,20 +78,29 @@ def pb_edit_and_import(
     syntax: str,
     source_path: str,
     comments: str = "",
+    source_encoding: str = "UTF-8",
 ) -> dict[str, Any]:
     """Atomic write-then-import for a PowerBuilder entry source.
 
-    Persists `syntax` to `source_path` on disk in canonical PB encoding
-    (UTF-16 LE BOM + CRLF), rebuilds the canonical PB IDE export header
-    block (`$PBExportHeader$<entry_name>.<ext>` on line 1, plus
+    Persists `syntax` to `source_path` on disk in the encoding PB IDE
+    writes for the workspace (one of `"UTF-8"` / `"UTF-16BOM"` /
+    `"ANSI"` — same vocabulary as the `.pbw` `DefaultExportEncode`
+    directive; default `"UTF-8"`), rebuilds the canonical PB IDE export
+    header block (`$PBExportHeader$<entry_name>.<ext>` on line 1, plus
     `$PBExportComments$<escaped>` on line 2 when `comments` is non-empty,
     using PowerScript escape sequences such as `~r~n`), and then imports
     the syntax into `lib_path`. Any caller-supplied `$PBExportHeader$` /
     `$PBExportComments$` lines at the top of `syntax` are discarded —
     `comments` is the single source of truth for entry comment metadata.
-    Replaces the three-step "agent writes file in UTF-8 + agent re-encodes
-    to UTF-16 + agent calls pb_compile_entry_import" pattern with a single
-    call.
+
+    The caller should read `DefaultExportEncode` from the workspace's
+    `.pbw` and pass the matching `source_encoding`. Mismatched encoding
+    silently triggers a cascade in PB IDE on the next Refresh (the IDE
+    re-exports the file with the workspace's configured encoding,
+    producing a phantom diff).
+
+    Replaces the three-step "agent writes file + agent re-encodes +
+    agent calls pb_compile_entry_import" pattern with a single call.
 
     Parent directories of `source_path` must already exist. The caller
     chooses the location (usually
@@ -98,12 +109,17 @@ def pb_edit_and_import(
     session = Session.instance()
     try:
         success, errors = session.edit_and_import(
-            lib_path, entry_name, entry_type, syntax, source_path, comments
+            lib_path, entry_name, entry_type, syntax, source_path, comments, source_encoding
         )
     except SessionStateError as exc:
         return _error("PB_ORCA_MCP_STATEERROR", str(exc))
     except ValueError as exc:
         return _error("PB_ORCA_MCP_INVALIDARGS", str(exc))
+    except UnicodeEncodeError as exc:
+        return _error(
+            "PB_ORCA_MCP_ENCODINGERROR",
+            f"text contains characters that cannot be encoded as {source_encoding}: {exc}",
+        )
     except OSError as exc:
         return _error("PB_ORCA_MCP_IOERROR", str(exc))
     except OrcaError as exc:

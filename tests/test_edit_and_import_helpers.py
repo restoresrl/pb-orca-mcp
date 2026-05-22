@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from pb_orca_mcp.orca.session import _escape_pb_comment, _strip_export_headers
+from pb_orca_mcp.orca.session import (
+    _encode_for_disk,
+    _escape_pb_comment,
+    _strip_export_headers,
+)
 
 
 class TestEscapePbComment:
@@ -104,3 +108,47 @@ class TestStripExportHeaders:
 )
 def test_escape_pb_comment_parametric(raw: str, expected: str) -> None:
     assert _escape_pb_comment(raw) == expected
+
+
+class TestEncodeForDisk:
+    """`_encode_for_disk` matches the BOM + codec PB IDE writes for each `.pbw` setting."""
+
+    def test_utf_8_bom(self) -> None:
+        out = _encode_for_disk("hello", "UTF-8")
+        # EF BB BF + UTF-8 bytes
+        assert out == b"\xef\xbb\xbf" + b"hello"
+
+    def test_utf_16_bom_le(self) -> None:
+        out = _encode_for_disk("hello", "UTF-16BOM")
+        # FF FE + UTF-16 LE bytes (each ASCII char as 2 bytes)
+        assert out == b"\xff\xfe" + "hello".encode("utf-16-le")
+
+    def test_ansi_no_bom(self) -> None:
+        # ASCII subset survives ANSI/mbcs cleanly on any Windows codepage.
+        out = _encode_for_disk("hello", "ANSI")
+        assert out == b"hello"
+
+    def test_utf_8_preserves_unicode(self) -> None:
+        out = _encode_for_disk("àbé—", "UTF-8")
+        assert out == b"\xef\xbb\xbf" + "àbé—".encode()
+
+    def test_utf_16_preserves_unicode(self) -> None:
+        out = _encode_for_disk("àbé—", "UTF-16BOM")
+        assert out == b"\xff\xfe" + "àbé—".encode("utf-16-le")
+
+    def test_unknown_encoding_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unsupported source_encoding"):
+            _encode_for_disk("hello", "EBCDIC")
+
+    def test_ansi_rejects_out_of_codepage_chars(self) -> None:
+        # CJK ideograph (U+4E2D, "middle") is not in any single-byte
+        # Western Windows codepage (CP1252, CP1250, …). PB IDE writes
+        # ANSI `.sru` files in strict mode too — we surface this as
+        # `UnicodeEncodeError`, mapped by the MCP wrapper to
+        # `PB_ORCA_MCP_ENCODINGERROR`.
+        import sys
+
+        if sys.platform != "win32":
+            pytest.skip("ANSI/mbcs codec is Windows-only")
+        with pytest.raises(UnicodeEncodeError):
+            _encode_for_disk("contains CJK 中 char", "ANSI")
