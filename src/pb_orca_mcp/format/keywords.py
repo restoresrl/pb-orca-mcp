@@ -1,0 +1,67 @@
+"""PowerScript reserved words and helper sets.
+
+The lists are deliberately conservative: we include only words documented
+as reserved in the Appeon PowerBuilder Object Reference (or appearing as
+reserved in public ANTLR grammars). Standard global objects (``SQLCA``,
+``Message``, ...) and predefined functions are identifiers, not
+keywords, and are deliberately excluded — touching their case would
+risk colliding with user-defined names.
+"""
+
+from __future__ import annotations
+
+KEYWORDS: frozenset[str] = frozenset(
+    {
+        "alias", "and", "as", "autoinstantiate",
+        "by",
+        "call", "case", "catch", "choose", "close", "commit", "connect",
+        "constant", "continue", "create", "cursor",
+        "declare", "delete", "describe", "descriptor", "descriptors",
+        "destroy", "disconnect", "do", "dynamic",
+        "else", "elseif", "end", "enumerated", "event", "execute", "exit",
+        "external",
+        "false", "fetch", "finally", "for", "forward", "from", "function",
+        "global", "goto",
+        "halt",
+        "if", "immediate", "in", "indirect", "insert", "into", "intrinsic",
+        "is",
+        "library", "local", "loop",
+        "namespace", "native", "next", "not", "null",
+        "of", "on", "open", "or",
+        "parent", "post", "prepare", "prepared", "private", "privatewrite",
+        "procedure", "protected", "protectedwrite", "prototypes", "public",
+        "readonly", "ref", "release", "return", "rollback", "rpcfunc",
+        "select", "selectblob", "set", "shared", "static", "step",
+        "subroutine", "super", "system", "systemread",
+        "then", "this", "throw", "throws", "to", "trigger", "true", "try",
+        "type",
+        "until", "update", "updateblob", "using",
+        "values", "variables",
+        "when", "where", "while", "with", "within",
+    }
+)
+
+DATATYPES: frozenset[str] = frozenset(
+    {
+        "any", "blob", "boolean", "byte",
+        "char", "character",
+        "date", "datetime", "dec", "decimal", "double",
+        "int", "integer",
+        "long", "longlong", "longptr",
+        "real",
+        "string",
+        "time",
+        "uint", "ulong", "unsignedinteger", "unsignedlong",
+    }
+)
+
+RESERVED: frozenset[str] = KEYWORDS | DATATYPES
+
+UNARY_PREFIX_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "and", "as", "by", "case", "choose", "do", "else", "elseif",
+        "for", "from", "if", "in", "into", "is", "not", "or",
+        "ref", "return", "set", "step", "then", "throw", "throws", "to",
+        "until", "values", "when", "where", "while",
+    }
+)
