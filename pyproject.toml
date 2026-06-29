@@ -29,11 +29,6 @@ dependencies = [
     "mcp>=1.0",
     "pydantic>=2.0",
     "click>=8.1",
-    # PowerScript formatter reads .pb-format.toml. Python 3.11+ has tomllib
-    # in the stdlib; on 3.10 we need the tomli backport. Without this the
-    # server crashes at import on a stock 3.10 interpreter (the format module
-    # is imported eagerly via tools/compile.py).
-    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +41,6 @@ dev = [
 
 [project.scripts]
 pb-orca-mcp = "pb_orca_mcp.__main__:cli"
-pb-format = "pb_orca_mcp.cli_format:cli"
 
 [project.urls]
 Homepage = "https://github.com/restoresrl/pb-orca-mcp"

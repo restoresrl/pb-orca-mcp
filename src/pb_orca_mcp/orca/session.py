@@ -35,7 +35,6 @@ from ctypes import c_long, pointer
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from pb_orca_mcp.format import format_powerscript
 from pb_orca_mcp.orca.constants import (
     PBORCA_BUFFERTOOSMALL,
     PBORCA_COMPERROR,
@@ -56,7 +55,6 @@ from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO, PBORCA_EXEINFO, PBORCA_SCC
 
 if TYPE_CHECKING:
     from pb_orca_mcp.discovery import PbInstall
-    from pb_orca_mcp.format import FormatConfig
     from pb_orca_mcp.orca.dll import OrcaApi
 
 
@@ -512,7 +510,6 @@ class Session:
         source_path: str,
         comments: str = "",
         source_encoding: str = "UTF-8",
-        format_config: FormatConfig | None = None,
     ) -> tuple[bool, list[dict[str, Any]]]:
         """Atomic write-then-import for a PowerBuilder entry source.
 
@@ -565,13 +562,6 @@ class Session:
         export. Without either, PB IDE sees the file as out-of-sync
         with the PBL on the next Refresh and triggers an import +
         compile + regenerate cascade.
-
-        If `format_config` is non-None, the body is run through
-        `pb_orca_mcp.format.format_powerscript` after header stripping
-        and before the canonical header is rebuilt. The caller (the MCP
-        tool layer) is responsible for resolving the workspace's
-        `.pb-format.toml` into a `FormatConfig` and deciding whether
-        to skip formatting (e.g. for DataWindow entries).
         """
         # Resolve the extension early so a bad entry_type fails fast,
         # before we touch the filesystem.
@@ -587,12 +577,6 @@ class Session:
         # Strip any caller-supplied $PBExportHeader$ / $PBExportComments$
         # so we can rebuild the canonical header block from scratch.
         body = _strip_export_headers(syntax)
-
-        # Apply the formatter to the body if the caller resolved a
-        # FormatConfig. Headers must be stripped first so the formatter
-        # never sees the `$PBExport*$` magic lines.
-        if format_config is not None:
-            body = format_powerscript(body, format_config)
 
         # Normalize comment newlines to CRLF before storing and
         # escaping (see `_normalize_pb_comment_newlines`).

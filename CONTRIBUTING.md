@@ -3,9 +3,8 @@
 Thanks for your interest. This project bridges Claude Code (and other MCP
 clients) to PowerBuilder through the ORCA API. Because ORCA is a Win32
 DLL shipped only with the PB IDE, some of the development loop is
-inherently Windows- and PB-specific — but most of the code (parsing,
-discovery, the formatter, the MCP plumbing) is plain Python you can work
-on anywhere.
+inherently Windows- and PB-specific — but a lot of the code (parsing,
+discovery, the MCP plumbing) is plain Python you can work on anywhere.
 
 ## Ground rules
 
@@ -41,8 +40,8 @@ mypy src
 `pborc.dll` is loaded with `ctypes`, so **the Python interpreter must
 match the DLL's architecture**. The PB IDE is x86 across releases through
 2025, so running the PB-dependent tests usually needs an **x86 Python**.
-The pure-Python tests (parsing, discovery logic, the formatter, the
-`pb-format` CLI) run on any interpreter.
+The pure-Python tests (parsing, discovery logic, the `.pbt`/`.pbw`
+parser, the MCP tool wrappers) run on any interpreter.
 
 ### PB-dependent tests
 

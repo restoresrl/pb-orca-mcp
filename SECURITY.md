@@ -6,8 +6,8 @@
 PowerBuilder install through `pborc.dll`. It opens no network sockets and
 ships no server component. The most relevant risks are therefore:
 
-- A malicious `.pbt` / `.pbw` / `.pb-format.toml` or source file causing
-  unexpected file writes outside the intended workspace.
+- A malicious `.pbt` / `.pbw` or source file causing unexpected file
+  writes outside the intended workspace.
 - Path handling that escapes the directory the caller intended.
 
 ## Reporting a vulnerability

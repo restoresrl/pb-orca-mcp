@@ -12,8 +12,8 @@ A clear description of the bug, and what you expected instead.
 
 ## Reproduction
 
-Minimal steps to reproduce. Include the exact MCP tool call or
-`pb-format` command, and the input it ran on.
+Minimal steps to reproduce. Include the exact MCP tool call and the
+input it ran on.
 
 ## Environment
 

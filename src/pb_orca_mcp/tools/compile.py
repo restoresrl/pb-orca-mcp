@@ -10,8 +10,7 @@ Tools exposed:
 - `pb_compile_entry_import_list(items)`: batch import. `items` is a list of
   dicts with the same keys as the single-entry call.
 - `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path,
-  comments="", source_encoding="UTF-8", format="auto")`: atomic
-  write-then-import.
+  comments="", source_encoding="UTF-8")`: atomic write-then-import.
   Persists `syntax` to `source_path` in the encoding PB IDE writes for
   the workspace (`"UTF-8"` / `"UTF-16BOM"` / `"ANSI"` — match the
   `.pbw` `DefaultExportEncode`), rebuilds the PB IDE export header
@@ -19,16 +18,10 @@ Tools exposed:
   `$PBExportComments$<escaped>` on line 2 when `comments` is non-empty
   — PowerScript escape, e.g. CRLF → `~r~n`), then imports. Single
   tool call instead of the three-step "edit + re-encode + import"
-  pattern. Response shape extends `pb_compile_entry_import` with
-  `formatted: bool` (true when the optional PowerScript body normalizer
-  was applied). Writing both the `$PBExportComments$` line and the
+  pattern. Writing both the `$PBExportComments$` line and the
   matching encoding is what keeps the on-disk source byte-identical to
   PB IDE's own export — without either, the IDE triggers a refresh +
-  regenerate cascade. The `format` parameter (`"auto"` / `True` /
-  `False`) controls the optional normalizer; in `"auto"` mode it
-  activates only when `.pb-format.toml` is discovered walking up from
-  `source_path`, so workspaces without that file behave exactly as
-  before.
+  regenerate cascade.
 - `pb_application_rebuild(rebuild_type)`: full/incremental/migrate/3pass
   rebuild of the current application. Requires `pb_session_open` +
   `pb_set_library_list` + `pb_set_current_application` first.
@@ -44,15 +37,8 @@ Any other negative return code becomes an OrcaError envelope.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
-from pb_orca_mcp.format import (
-    SOURCE_EXTENSIONS,
-    FormatConfig,
-    discover_config,
-)
-from pb_orca_mcp.orca.constants import extension_for_entry_type
 from pb_orca_mcp.orca.errors import OrcaError
 from pb_orca_mcp.orca.session import Session, SessionStateError
 
@@ -93,7 +79,6 @@ def pb_edit_and_import(
     source_path: str,
     comments: str = "",
     source_encoding: str = "UTF-8",
-    format: bool | str = "auto",
 ) -> dict[str, Any]:
     """Atomic write-then-import for a PowerBuilder entry source.
 
@@ -114,38 +99,14 @@ def pb_edit_and_import(
     re-exports the file with the workspace's configured encoding,
     producing a phantom diff).
 
-    `format` controls the optional PowerScript body normalizer (indent,
-    keyword case, operator spacing, line endings). Three modes:
-
-    - `"auto"` (default): walk up from `source_path` looking for a
-      `.pb-format.toml`. If found, format the body with the rules in
-      that file. If absent, behave exactly as before (no formatting).
-      Zero-breaking-change opt-in: a workspace only gets normalized
-      output once it commits `.pb-format.toml`.
-    - `True`: force formatting. If no `.pb-format.toml` is found, use
-      the engine's hard-coded defaults (tab indent, lowercase keywords,
-      CRLF, spaces around operators).
-    - `False`: skip formatting entirely.
-
-    DataWindow entries (and any other entry type without a `.sr*`
-    extension) are skipped regardless of `format` — their source uses
-    a different mini-DSL the formatter doesn't understand.
-
     Replaces the three-step "agent writes file + agent re-encodes +
     agent calls pb_compile_entry_import" pattern with a single call.
 
     Parent directories of `source_path` must already exist. The caller
     chooses the location (usually
     `<workspace>/ws_objects/<lib>.pbl.src/<entry_name>.<ext>`).
-
-    The response includes `formatted: bool` so the caller can tell
-    whether the body was normalized.
     """
     session = Session.instance()
-    try:
-        format_config = _resolve_format(format, source_path, entry_type)
-    except ValueError as exc:
-        return _error("PB_ORCA_MCP_INVALIDARGS", str(exc))
     try:
         success, errors = session.edit_and_import(
             lib_path,
@@ -155,7 +116,6 @@ def pb_edit_and_import(
             source_path,
             comments,
             source_encoding,
-            format_config,
         )
     except SessionStateError as exc:
         return _error("PB_ORCA_MCP_STATEERROR", str(exc))
@@ -176,49 +136,8 @@ def pb_edit_and_import(
         "entry_name": entry_name,
         "entry_type": entry_type,
         "source_path": source_path,
-        "formatted": format_config is not None,
         "errors": errors,
     }
-
-
-def _resolve_format(mode: bool | str, source_path: str, entry_type: str) -> FormatConfig | None:
-    """Turn the public `format` argument into a `FormatConfig` (apply) or `None` (skip).
-
-    The decision tree:
-
-    - `mode is False` → never format.
-    - `entry_type` has no `.sr*` extension (project, proxy, binary) or
-      its extension is `.srd` (DataWindow) → never format. These would
-      either crash the formatter or rewrite a mini-DSL the engine
-      doesn't understand.
-    - `mode == "auto"` → format only if `.pb-format.toml` is discovered.
-    - `mode is True` → always format; use discovered config or defaults.
-
-    A malformed `.pb-format.toml` surfaces as `ValueError` and the MCP
-    layer turns it into a `PB_ORCA_MCP_INVALIDARGS` envelope.
-    """
-    if mode is False:
-        return None
-    if mode is True:
-        force = True
-    elif mode == "auto":
-        force = False
-    else:
-        raise ValueError(f"format must be 'auto', True, or False (got {mode!r})")
-
-    try:
-        ext = extension_for_entry_type(entry_type)
-    except ValueError:
-        # Entry type has no on-disk source representation; let session
-        # raise the canonical error downstream. We just skip the formatter.
-        return None
-    if f".{ext}" not in SOURCE_EXTENSIONS:
-        return None
-
-    config_path = discover_config(Path(source_path))
-    if config_path is None:
-        return FormatConfig.default() if force else None
-    return FormatConfig.from_path(config_path)
 
 
 def pb_compile_entry_import_list(items: list[dict[str, Any]]) -> dict[str, Any]:

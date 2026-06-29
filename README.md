@@ -109,11 +109,12 @@ Full design and rationale in [`PLAN.md`](PLAN.md).
 **v0.1.0 released** (2026-05-13); active development on `main` since.
 All ORCA primitives are wired through to MCP tools (30 total); ABI tested
 against PB 2022 R3 — the same set of prototypes covers any release since
-PB 2019 (ABI stable). 377 pytest tests green, plus 8 PB-dependent tests
+PB 2019 (ABI stable). 160 pytest tests green, plus 8 PB-dependent tests
 that skip without a local PB install, including the end-to-end
 compile-test loop validated with Claude Code driving the MCP server
 against a real PB 22.0 workspace. Since the tag: the `pb_edit_and_import`
-tool, an opt-in PowerScript body formatter, and the `pb-format` CLI.
+tool. The PowerScript style formatter that briefly lived here now ships
+separately as [`pb-format`](https://github.com/restoresrl/pb-format).
 
 Currently in internal dogfooding. The package is being readied for a
 first PyPI publish (name reserved, MIT-licensed, CI green), but the
@@ -130,6 +131,10 @@ stability — no fixed date.
 
 ## Related projects
 
+- [`pb-format`](https://github.com/restoresrl/pb-format) — standalone
+  PowerScript style formatter (CLI + library), extracted from this repo.
+  ORCA-independent; pair it with `pb-orca-mcp` to normalize `.sr*`
+  sources before importing them.
 - [`pb-ai-code`](https://github.com/restoresrl/pb-ai-code) — agentic dev
   kit for PowerBuilder built on top of `pb-orca-mcp`: skills, ingested
   Appeon docs, test orchestration, debugging patterns and slash

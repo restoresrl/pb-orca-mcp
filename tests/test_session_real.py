@@ -235,69 +235,6 @@ def test_compile_entry_import_happy_path_application(tmp_path: Path) -> None:
 
 
 @pytest.mark.requires_pb
-def test_edit_and_import_applies_formatter_end_to_end(tmp_path: Path) -> None:
-    """`pb_edit_and_import` with `.pb-format.toml` present formats then imports.
-
-    End-to-end coverage of the formatter integration against real ORCA:
-    drops a `.pb-format.toml` (keyword_case = upper) in the workspace,
-    calls the MCP tool with `format="auto"` so it discovers that config,
-    and asserts (1) the tool reports `formatted=True`, (2) the import
-    succeeds, and (3) the on-disk source was actually transformed
-    (reserved words upper-cased). Upper-casing is PowerScript-safe — the
-    language is case-insensitive — so the re-imported application still
-    compiles clean.
-    """
-    from pb_orca_mcp.tools.compile import pb_edit_and_import
-
-    loaded = _open_pb22_or_skip()
-    if loaded is None:
-        return
-    _target, api = loaded
-
-    import shutil
-
-    pbl = str(tmp_path / "genapp.pbl")
-    shutil.copyfile(_FIXTURES / "genapp.pbl", pbl)
-
-    # Opt the workspace into formatting: force upper-case keywords so the
-    # effect is observable on disk.
-    (tmp_path / ".pb-format.toml").write_text(
-        '[style]\nkeyword_case = "upper"\nline_endings = "crlf"\n',
-        encoding="utf-8",
-    )
-    source_path = str(tmp_path / "genapp.sra")
-    syntax = _read_pb_source(_FIXTURES / "genapp.sra")
-
-    session = Session.instance()
-    session.open(api)
-    try:
-        session.set_library_list([pbl])
-        session.set_current_application(pbl, "genapp")
-
-        result = pb_edit_and_import(
-            lib_path=pbl,
-            entry_name="genapp",
-            entry_type="application",
-            syntax=syntax,
-            source_path=source_path,
-            comments="formatter e2e",
-            source_encoding="UTF-16BOM",
-            format="auto",
-        )
-
-        assert "error" not in result, f"tool returned error: {result}"
-        assert result["formatted"] is True, "formatter did not run (config not discovered?)"
-        assert result["success"] is True, f"import failed: errors={result.get('errors')}"
-
-        on_disk = _read_pb_source(Path(source_path))
-        # The `forward` line is a bare reserved word → upper-cased to FORWARD.
-        assert "FORWARD" in on_disk, "keyword_case=upper was not applied to the body"
-        assert on_disk.startswith("$PBExportHeader$genapp.sra"), "header block not rebuilt"
-    finally:
-        session.close()
-
-
-@pytest.mark.requires_pb
 def test_path_env_var_roundtrip_around_load_and_close() -> None:
     """`load_orca` prepends PB dirs to `PATH`; `Session.close()` restores it.
 

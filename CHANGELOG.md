@@ -13,22 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   entry. Persists `syntax` to disk in the workspace export encoding,
   rebuilds the `$PBExportHeader$` / `$PBExportComments$` block, then
   imports — replacing the three-step edit + re-encode + import pattern.
-- Token-based PowerScript body formatter (`pb_orca_mcp.format`): four
-  opt-in invariants (indent, line endings, keyword case, operator
-  spacing), enabled per workspace by committing a `.pb-format.toml`.
-  `pb_edit_and_import` gained a `format` parameter (`"auto"` / `True` /
-  `False`, default `"auto"`).
-- `pb-format` CLI (`detect` / `format` / `check`) console script for
-  using the formatter offline, without an ORCA session. Preserves the
-  export header and on-disk encoding (UTF-16 LE / UTF-8, with or without
-  BOM); `check` exits non-zero on drift for pre-commit / CI use.
+
+### Changed
+
+- The PowerScript style formatter that briefly lived here was extracted
+  into a separate, ORCA-independent project,
+  [`pb-format`](https://github.com/restoresrl/pb-format). `pb-orca-mcp`
+  is now strictly an ORCA read/write server and does not format source.
+  `pb_edit_and_import` no longer takes a `format` parameter or returns
+  `formatted`; run `pb-format` over the `.sr*` files separately for
+  style normalization. The `tomli` dependency is dropped with it.
 
 ### Fixed
 
-- Declare `tomli` as a runtime dependency on Python `< 3.11`. The
-  formatter reads `.pb-format.toml`, and the format module is imported
-  eagerly by the compile tools — without this the server crashed at
-  import on a stock Python 3.10 interpreter.
 - Lint and formatting brought back to a clean `ruff check` /
   `ruff format --check` so CI passes.
 

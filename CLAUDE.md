@@ -158,14 +158,23 @@ sezione + `gh repo edit ... --visibility public` + `twine upload`.
   atomiche, snapshot dei bytes della pbl prima della call e restore on
   failure.
 
-## Sibling project — `pb-ai-code`
+## Sibling projects — `pb-format`, `pb-ai-code`
 
-Esiste un repo gemello, `../pb-ai-code/` (creato 2026-05-14, ancora in
-design phase): è il **dev kit agentico per PowerBuilder** che ha
-`pb-orca-mcp` come dipendenza required e ci costruisce sopra skill, docs
-Appeon ingestite, orchestrazione di test, pattern di debug post-mortem e
-slash command. La visione 4-pilastri (progettazione + coding + testing +
-debugging agentico su PB) vive lì, non qui.
+**`../pb-format/`** (estratto da qui il 2026-06-29): il formatter di
+stile PowerScript (engine token-based + CLI `pb-format`) vive ora in un
+progetto separato, **indipendente da ORCA**. Era nato dentro
+`pb-orca-mcp` ma violava lo scope "puro ORCA" (conosce la sintassi del
+linguaggio e scrive file su disco), quindi è stato spostato.
+`pb-orca-mcp` **non** lo importa: sono due pacchetti componibili da chi
+li usa. `pb_edit_and_import` resta come write+import puro, senza
+formatting. Vedi [[sibling-pb-format]] in memory.
+
+**`../pb-ai-code/`** (creato 2026-05-14, ancora in design phase): è il
+**dev kit agentico per PowerBuilder** che ha `pb-orca-mcp` come
+dipendenza required e ci costruisce sopra skill, docs Appeon ingestite,
+orchestrazione di test, pattern di debug post-mortem e slash command. La
+visione 4-pilastri (progettazione + coding + testing + debugging agentico
+su PB) vive lì, non qui.
 
 `pb-orca-mcp` resta scope-limited all'API ORCA (engine + primitive); la
 parte di workflow + knowledge + orchestrazione sta in `pb-ai-code`
