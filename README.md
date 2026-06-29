@@ -67,10 +67,9 @@ No IDE window is ever opened.
 
 **Boundaries.** pb-orca is an inspect / compile / build bridge through
 ORCA — not a release build runner (PowerGen and batch scripts stay), and
-it does not enforce source style (that's
-[`pb-format`](https://github.com/restoresrl/pb-format)). It reads and
-writes PowerBuilder libraries; higher-level orchestration, skills and
-knowledge live in [`pb-ai-code`](https://github.com/restoresrl/pb-ai-code).
+it does not enforce source style or higher-level agentic orchestration.
+Those are the job of separate, optional tools (not included); pb-orca just
+reads and writes PowerBuilder libraries.
 
 ## Quickstart
 
@@ -134,7 +133,7 @@ Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/u
 
 ## Architecture highlights
 
-- **Multi-version from day 1**: discovery enumerates every PB IDE on the
+- **Multi-version**: discovery enumerates every PB IDE on the
   machine. Each install ships its own `pborc.dll` under `<install>\IDE\`;
   the loader picks the right one per session. PB 2019 R3 and later versions
   coexisting is a supported configuration.
@@ -161,9 +160,9 @@ PB 2019 (ABI stable). 126 pytest tests green, plus 8 PB-dependent tests
 that skip without a local PB install, including the end-to-end
 compile-test loop validated with Claude Code driving the MCP server
 against a real PB 22.0 workspace. Since the tag, the codebase was
-refactored to keep this server purely ORCA: both the PowerScript style
-formatter and the well-formed `.sr*` writer moved to the standalone
-[`pb-format`](https://github.com/restoresrl/pb-format) package.
+refactored to keep this server purely ORCA: the PowerScript style
+formatter and the well-formed `.sr*` writer moved out to a separate,
+optional package (not included).
 
 Currently in internal dogfooding. The package is being readied for a
 first PyPI publish (name reserved, MIT-licensed, CI green), but the
