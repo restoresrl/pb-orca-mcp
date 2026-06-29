@@ -3,11 +3,12 @@
 How to register `pb-orca-mcp` with Claude Code (or any other MCP client),
 including the arch-matching caveat that trips up most first-time installs.
 
-> **Not on PyPI yet.** Install from a clone (see
-> [`installation.md`](installation.md)). The snippets below run the server
-> straight from source with `uvx --from <clone>`, where `<clone>` is the
-> absolute path to your checkout (e.g. `C:\path\to\pb-orca-mcp`). Once the
-> package is published, drop `--from <clone>` and use the bare package name.
+> **Install from GitHub.** `uv` runs the server straight from the repo. The
+> snippets below use
+> `--from git+https://github.com/restoresrl/pb-orca-mcp`; if you're
+> developing on the server itself, replace that with an absolute path to
+> your local clone (`--from C:\path\to\pb-orca-mcp`). See
+> [`installation.md`](installation.md).
 
 ## 1. Verify your environment
 
@@ -15,7 +16,7 @@ Before wiring anything into Claude Code, confirm `pb-orca-mcp` can see at
 least one PowerBuilder install from your terminal:
 
 ```pwsh
-uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp doctor
+uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
 ```
 
 A working setup ends with `Doctor OK: N usable install(s) for x86 Python.`
@@ -36,15 +37,15 @@ Add a `pb-orca` entry to one of:
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"]
+      "args": ["--from", "git+https://github.com/restoresrl/pb-orca-mcp", "pb-orca-mcp"]
     }
   }
 }
 ```
 
-`uvx --from <clone>` rebuilds and runs the current source on each launch —
-no reinstall after a `git pull`. This handles the common case of one PB IDE
-on the machine.
+`uvx --from git+<url>` builds and runs the server from the repo on each
+launch — no manual clone (pin a release by appending `@<tag>` to the URL).
+This handles the common case of one PB IDE on the machine.
 
 ### When you have multiple PB versions installed
 
@@ -67,7 +68,7 @@ This is what Claude Code will do naturally when you tell it "use PB 2022 R3".
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"],
+      "args": ["--from", "git+https://github.com/restoresrl/pb-orca-mcp", "pb-orca-mcp"],
       "env": {
         "PB_INSTALL_PATH": "C:\\Program Files (x86)\\Appeon\\PowerBuilder 22.0"
       }
@@ -89,7 +90,7 @@ a specific x86 interpreter:
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "--python", "3.12-x86", "pb-orca-mcp"]
+      "args": ["--from", "git+https://github.com/restoresrl/pb-orca-mcp", "--python", "3.12-x86", "pb-orca-mcp"]
     }
   }
 }
@@ -110,10 +111,10 @@ You should see `pb-orca` listed under "Connected servers" with `29 tools`
 exposed. If `0 tools` or the server isn't listed, check:
 
 - The `command`/`args` resolve in your shell:
-  `uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp --help` should print the
-  click help.
-- `uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp doctor` (in your shell)
-  exits 0.
+  `uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp --help`
+  should print the click help.
+- `uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor`
+  (in your shell) exits 0.
 - Claude Code's MCP log: a failed server prints its stderr there.
 
 ## 4. Install the agent skills (recommended)

@@ -73,39 +73,37 @@ reads and writes PowerBuilder libraries.
 
 ## Quickstart
 
-Not on PyPI yet — install from a clone of this repo. (`uv` is the
-[Astral installer](https://docs.astral.sh/uv/); `pipx` works too.)
+`uv` installs the server straight from the GitHub repo — no clone needed.
+(`uv` is the [Astral installer](https://docs.astral.sh/uv/).)
 
 ```pwsh
-# 1. Clone, then run straight from source with uvx --from
-git clone https://github.com/restoresrl/pb-orca-mcp
-uvx --from .\pb-orca-mcp pb-orca-mcp doctor
+# Verify the local PowerBuilder install(s) are detected
+uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
 
-#    If your PB IDE is x86 (the common case), pin an x86 Python:
-#    uvx --from .\pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
-
-# 2. doctor should end with "Doctor OK: N usable install(s)".
-# 3. Wire it into Claude Code (below).
+#   Pin a release:  ...pb-orca-mcp@v0.1.0   (append @<tag> to the URL)
+#   x86 PB IDE (the common case): add  --python 3.12-x86
+# doctor should end with "Doctor OK: N usable install(s)".
 ```
 
-In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide) —
-point `--from` at your clone (absolute path):
+In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide):
 
 ```json
 {
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"]
+      "args": ["--from", "git+https://github.com/restoresrl/pb-orca-mcp", "pb-orca-mcp"]
     }
   }
 }
 ```
 
-`uvx --from <clone>` builds and runs the current source each time — no
-reinstall after a `git pull`. Once the package is on PyPI this collapses to
-`"args": ["pb-orca-mcp"]`. After restarting Claude Code, `/mcp` should list
-the `pb_*` tools. Full setup walkthrough (x86 pinning, multi-version,
+`uvx --from git+<url>` builds and runs the server straight from the repo —
+no clone needed. (Working *on* pb-orca itself? Clone it and
+point `--from` at the local path instead — see
+[`docs/installation.md`](docs/installation.md).) After restarting Claude
+Code, `/mcp` should list the `pb_*` tools. Full setup walkthrough (x86
+pinning, multi-version,
 troubleshooting): [`docs/claude-code-setup.md`](docs/claude-code-setup.md).
 
 ## Requirements
@@ -161,7 +159,7 @@ Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/u
 ## Status
 
 Alpha, in active development on `main`. `v0.1.0` is **tagged** (GitHub
-release, 2026-05-13) but **not yet on PyPI** — install from source (see
+release, 2026-05-13); install it from the repo with `uv` (see
 [Quickstart](#quickstart)).
 
 All of ORCA's public API is wired through to MCP tools (29 total). The ABI
@@ -171,9 +169,10 @@ The test suite is green, including an end-to-end compile-test loop run by
 Claude Code against a real PB 22.0 workspace; the PB-dependent tests skip
 cleanly when no local PB install is present.
 
-Currently in **internal dogfooding**: a public PyPI release (name reserved,
-MIT-licensed, CI green) is deliberately deferred until real-world use
-confirms stability — no fixed date.
+A GitHub-hosted, MIT-licensed project for PowerBuilder developers on Windows
+to use and contribute to. The repository is **currently private during
+internal dogfooding** and will be made public once real-world use confirms
+stability — no fixed date.
 
 ## Documentation
 

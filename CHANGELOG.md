@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation consolidated: `docs/recipes.md` + `docs/workflow.md` merged
   into a single [`docs/usage.md`](docs/usage.md). Internal development docs
   (dev process + design rationale) consolidated into a root `DEVELOPMENT.md`,
-  kept out of the published package; `CLAUDE.md` trimmed.
+  kept out of the package; `CLAUDE.md` trimmed.
 
 ### Fixed
 

@@ -8,18 +8,18 @@ non è elencato). Al flip a repo pubblico va rimosso o curato (es. estraendone u
 ## Stato & flip pubblico
 
 Stato corrente e maturità: vedi README §Status (single source of truth). In
-breve: repo privato `restoresrl/pb-orca-mcp`, **dogfooding interno**; flip
-pubblico + PyPI publish rimandati finché l'uso reale su workspace PB non conferma
+breve: repo privato `restoresrl/pb-orca-mcp`, **dogfooding interno**; il flip a
+**GitHub pubblico** è rimandato finché l'uso reale su workspace PB non conferma
 stabilità — nessuna scadenza.
 
 Checklist al momento del flip (cose ancora da fare):
 
-- rimuovere o curare questo `DEVELOPMENT.md`;
 - scrub `public-repo-hygiene` (no riferimenti Restore-internal, no path
   utente-specifici);
+- rimuovere o curare questo `DEVELOPMENT.md`;
 - `gh repo edit ... --visibility public`;
-- `python -m build` + `twine upload` (nome `pb-orca-mcp` su PyPI verificato
-  libero, licenza MIT, wheel + sdist buildabili in `dist/`).
+- (opzionale) GitHub Release sul tag `vX.Y.Z` per install pinnati via
+  `uvx --from git+...@vX.Y.Z`.
 
 ## Workflow di sviluppo
 
@@ -42,8 +42,9 @@ Checklist al momento del flip (cose ancora da fare):
   `mypy src` + `pytest` verdi prima del commit.
 - **Release loop**: feature/fix → pytest verde → smoke test via MCP con Claude
   Code in driver → commit + push → tag annotato `vX.Y.Z` → `git push origin
-  vX.Y.Z` → (futuro PyPI) `python -m build` + `twine upload`. Per release
-  significative, note nel messaggio del tag (`git show v0.1.0` come modello).
+  vX.Y.Z` → (eventuale) GitHub Release sul tag, per install pinnati via
+  `uvx --from git+...@vX.Y.Z`. Per release significative, note nel messaggio del
+  tag (`git show v0.1.0` come modello).
 
 ## Progetti correlati
 
@@ -83,5 +84,5 @@ Nessuna versione PB presente in nessuno dei due.
   cambia re-importandola con `CompileEntryImport` + nuovo `lpszComments`.
   (`PBORCA_LibraryCommentModify` esiste, ma modifica il commento della PBL stessa.)
 
-**Decisioni risolte:** licenza MIT; nome PyPI `pb-orca-mcp` libero; git remote
-`restoresrl/pb-orca-mcp` (push 2026-05-12).
+**Decisioni risolte:** licenza MIT; git remote `restoresrl/pb-orca-mcp`
+(push 2026-05-12).

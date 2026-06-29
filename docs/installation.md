@@ -26,43 +26,41 @@ the server through it. Example with `uv`:
 # Install an x86 Python via uv
 uv python install 3.12 --arch x86
 
-# Form A — pin x86 on the runner (no install):
-uvx --from .\pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
-
-# Form B — recreate the persistent tool from that interpreter:
-uv tool uninstall pb-orca-mcp
-uv tool install --python 3.12-x86 .\pb-orca-mcp
+# Add --python 3.12-x86 to whichever install form you use (see Install below):
+uvx --from git+https://github.com/restoresrl/pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
+#   from a local clone:  uvx --from .\pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
+#   persistent tool:     uv tool install --python 3.12-x86 git+https://github.com/restoresrl/pb-orca-mcp
 ```
-
-With `pipx` the Form B equivalent is
-`pipx install --python <path-to-x86-python.exe> .\pb-orca-mcp`.
 
 ## Install
 
-Not on PyPI yet — install from a clone of this repo. Two ways:
+`uv` installs the server straight from the GitHub repo.
+
+```pwsh
+# Use it — no clone. Pin a release by appending @<tag> to the URL.
+uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
+
+# Or as a persistent tool, so `pb-orca-mcp` is on PATH:
+uv tool install git+https://github.com/restoresrl/pb-orca-mcp
+```
+
+To **develop on the server itself**, clone it and point `--from` at the
+local checkout — that always runs your working tree (no reinstall after an
+edit), and it's the form the MCP config uses when hacking on the server:
 
 ```pwsh
 git clone https://github.com/restoresrl/pb-orca-mcp
-
-# A. Run straight from source (recommended while unpublished) — no install
-#    step, always runs the current checkout. This is also the form the MCP
-#    config uses.
 uvx --from .\pb-orca-mcp pb-orca-mcp doctor
-
-# B. Or install it as a persistent tool so `pb-orca-mcp` is on PATH.
-#    Re-run after a `git pull` to pick up changes.
-uv tool install .\pb-orca-mcp          # or: pipx install .\pb-orca-mcp
 ```
-
-Once the package is published, both collapse to the package name
-(`uvx pb-orca-mcp` / `uv tool install pb-orca-mcp`).
 
 ## Verify
 
 ```pwsh
-# Form A:
+# From GitHub:
+uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
+# From a local clone:
 uvx --from .\pb-orca-mcp pb-orca-mcp doctor
-# Form B (after `uv tool install`):
+# After `uv tool install`:
 pb-orca-mcp doctor
 ```
 
@@ -135,10 +133,10 @@ DLL's PE `VS_VERSION_INFO` resource is read as a fallback.
 ## Uninstall
 
 ```pwsh
-# Form B (a persistent tool install):
+# Only needed if you used `uv tool install`:
 uv tool uninstall pb-orca-mcp        # or: pipx uninstall pb-orca-mcp
 ```
 
-Form A (`uvx --from`) installs nothing persistent — delete the clone, and
+`uvx --from` installs nothing persistent — there's nothing to uninstall;
 optionally clear uv's build cache with `uv cache clean`. The package itself
 owns no on-disk state: no caches of its own, no config files.
