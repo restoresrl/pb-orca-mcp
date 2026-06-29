@@ -2,9 +2,7 @@
 
 MCP server that bridges Claude Code (and other MCP clients) to PowerBuilder
 via the ORCA API (`pborc.dll`, shipped with every PB IDE install). It works
-with **any PB version that exposes ORCA** — actively tested against PB
-2019 R3, 2022 R3, and 2025; the ORCA ABI has been stable since PB 2019,
-so other releases should work but are untested. It lets an AI coding agent
+with **any PB version that exposes ORCA**. It lets an AI coding agent
 inspect PBLs, compile entries, rebuild targets, and produce EXE/PBD
 artifacts — closing the "edit → compile → read errors → fix" loop that
 PowerBuilder's GUI-only IDE otherwise keeps closed.
@@ -53,9 +51,7 @@ Full setup walkthrough: [`docs/claude-code-setup.md`](docs/claude-code-setup.md)
 ## Requirements
 
 - **Windows**. ORCA is a Win32 DLL.
-- **PowerBuilder IDE edition** (not runtime-only — those lack `pborc.dll`).
-  Tested with PB 2019 R3, 2022 R3, 2025; the ABI has been stable since PB
-  2019, so other releases should also work but aren't in the CI matrix.
+- **PowerBuilder Development Environment** (not runtime-only — those lack `pborc.dll`).
 - **Python 3.10+** with the **same architecture** as the PB IDE you want
   to drive. PB IDE is historically x86 across all releases through 2025,
   so an **x86 Python interpreter** is the common case. The server refuses
@@ -86,7 +82,7 @@ Workflow recipes (compile-test loop, EXE build, hierarchy walk): [`docs/recipes.
 
 - **Multi-version from day 1**: discovery enumerates every PB IDE on the
   machine. Each install ships its own `pborc.dll` under `<install>\IDE\`;
-  the loader picks the right one per session. PB 2019 R3 + 2022 R3 + 2025
+  the loader picks the right one per session. PB 2019 R3 and later versions
   coexisting is a supported configuration.
 - **IDE / runtime distinction**: discovery filters out runtime-only installs
   (no `pborc.dll`) and surfaces them in a separate list — no crash, no
@@ -107,7 +103,7 @@ Full design and rationale in [`PLAN.md`](PLAN.md).
 ## Status
 
 **v0.1.0 released** (2026-05-13). All ORCA primitives are wired through
-to MCP tools; ABI tested against PB 2019 R3, 2022 R3, 2025 — same set of
+to MCP tools; ABI tested against PB 2022 R3 — same set of
 prototypes covers any release since PB 2019 (ABI stable). 107 pytest
 tests green, including the end-to-end compile-test loop validated with
 Claude Code driving the MCP server against a real PB 22.0 workspace.

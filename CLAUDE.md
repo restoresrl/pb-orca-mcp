@@ -1,8 +1,6 @@
 # CLAUDE.md — pb-orca-mcp
 
-Istruzioni locali al progetto. **Lingua di lavoro: italiano.** Se esiste un
-`CLAUDE.md` parent (workspace-level), questo lo estende con le specificità
-del progetto Python/MCP.
+Istruzioni locali al progetto. **Lingua di lavoro: italiano.**
 
 ## Contesto
 
