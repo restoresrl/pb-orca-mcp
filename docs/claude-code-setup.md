@@ -149,8 +149,8 @@ with version and arch. Then try:
 
 Claude calls `pb_session_open` with `pb_version: "22.0"`. The response
 includes the exact `pborc.dll` path that was loaded. From there any of
-the [recipes](recipes.md) is fair game — the compile-test loop (Recipe 1)
-is the canonical first real workflow to try.
+the recipes in the [usage guide](usage.md) is fair game — the compile-test
+loop (Recipe 1) is the canonical first real workflow to try.
 
 ## 6. Combine with sources extracted from PB
 

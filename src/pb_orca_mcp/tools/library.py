@@ -1,8 +1,8 @@
 """MCP tools for PBL library operations.
 
 Wraps `pb_orca_mcp.orca.session.Session.library_*` methods with the
-JSON-friendly input/output documented in PLAN.md §"Schema input/output dei
-tool". Errors come back as `{"error": {"code","name","message"}}`.
+JSON-friendly input/output documented in `docs/tools.md`. Errors come back
+as `{"error": {"code","name","message"}}`.
 
 Tools exposed:
 - `pb_library_create`: create a new PBL with an optional comment.

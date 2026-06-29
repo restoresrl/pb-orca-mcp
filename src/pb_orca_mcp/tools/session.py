@@ -1,8 +1,8 @@
 """MCP tools for ORCA session lifecycle and application setup.
 
 Wraps `pb_orca_mcp.orca.session.Session` with the input/output shape
-documented in PLAN.md §"Schema input/output dei tool". Errors are surfaced
-as `{"error": {"code", "name", "message"}}` payloads rather than raised
+documented in `docs/tools.md`. Errors are surfaced as
+`{"error": {"code", "name", "message"}}` payloads rather than raised
 exceptions, so the MCP layer can pass them straight through.
 
 Tools exposed:

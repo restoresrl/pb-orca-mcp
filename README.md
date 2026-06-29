@@ -130,7 +130,7 @@ total, grouped:
 | SCC | `pb_scc_connect_offline`, `pb_scc_set_target`, `pb_scc_refresh_target`, `pb_scc_exclude_library_list`, `pb_scc_get_connect_properties`, `pb_scc_close` |
 
 Full reference with input/output schema: [`docs/tools.md`](docs/tools.md).
-Workflow recipes (compile-test loop, EXE build, hierarchy walk): [`docs/recipes.md`](docs/recipes.md).
+Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/usage.md).
 
 ## Architecture highlights
 
@@ -144,15 +144,13 @@ Workflow recipes (compile-test loop, EXE build, hierarchy walk): [`docs/recipes.
 - **Explicit version selection**: callers pick the install with `pb_version`
   or `install_path` on `pb_session_open`. `.pbt`/`.pbw` files don't embed a
   PB version (they carry the 1999 file-format magic constant, not a release
-  marker), so there's no useful auto-pick. See PLAN §"Decisioni di scope".
+  marker), so there's no useful auto-pick.
 - **Single ORCA session per process**: enforced by the server. Switching
   installs means close + reopen — ORCA is single-session-per-process and
   not thread-safe.
 - **Callback lifetime handling**: ORCA fires Python WINFUNCTYPE callbacks
   for diagnostics and listings. We keep them alive in `Session._callback_refs`
   during each call — otherwise GC mid-call crashes the process.
-
-Full design and rationale in [`PLAN.md`](PLAN.md).
 
 ## Status
 
@@ -177,9 +175,7 @@ stability — no fixed date.
 - [`docs/installation.md`](docs/installation.md) — PB prerequisites, x86 vs x64 Python, troubleshooting
 - [`docs/claude-code-setup.md`](docs/claude-code-setup.md) — register the MCP server, install the agent skills, validate the setup
 - [`docs/tools.md`](docs/tools.md) — every MCP tool, input/output schema, examples
-- [`docs/recipes.md`](docs/recipes.md) — end-to-end workflows
-- [`docs/workflow.md`](docs/workflow.md) — the object-editing model (`.pbl` ↔ `ws_objects/` source of truth)
-- [`PLAN.md`](PLAN.md) — full design document
+- [`docs/usage.md`](docs/usage.md) — recipes (compile loop, build, queries) + the `.pbl` ↔ `ws_objects/` editing model
 
 The two agent skills — `pb-orca` (the engine/loop overview) and
 `pb-workflow` (the object-editing discipline) — live under
@@ -196,8 +192,7 @@ install them into Claude Code so the agent loads them automatically.
   kit for PowerBuilder built on top of `pb-orca-mcp`: skills, ingested
   Appeon docs, test orchestration, debugging patterns and slash
   commands for full agentic PB development (design, code, test, debug).
-  Currently in design phase; depends on this server as a required PyPI
-  library.
+  Currently in design phase; planned to build on this server.
 
 ## License
 

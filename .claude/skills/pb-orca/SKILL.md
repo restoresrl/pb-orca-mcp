@@ -89,5 +89,6 @@ is the engine overview; `pb-workflow` is the editing discipline.
 
 ## Reference
 
-Full tool schemas: `docs/tools.md`. End-to-end recipes: `docs/recipes.md`.
-The human-facing overview is the "How it works" section of the README.
+Full tool schemas: `docs/tools.md`. End-to-end recipes + the editing
+model: `docs/usage.md`. The human-facing overview is the "How it works"
+section of the README.

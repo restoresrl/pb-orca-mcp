@@ -50,19 +50,24 @@ Issues = "https://github.com/restoresrl/pb-orca-mcp/issues"
 packages = ["src/pb_orca_mcp"]
 
 [tool.hatch.build.targets.sdist]
+# CLAUDE.md and dev/ are intentionally NOT shipped: they are internal
+# development docs, not for package users (dev/ is also git-tracked but
+# excluded here).
 include = [
     "src/pb_orca_mcp",
     "tests",
     "docs",
     "README.md",
-    "CLAUDE.md",
     "CONTRIBUTING.md",
     "CHANGELOG.md",
     "SECURITY.md",
     "CODE_OF_CONDUCT.md",
     "LICENSE",
-    "PLAN.md",
+    ".gitattributes",
     "pyproject.toml",
+]
+exclude = [
+    "dev",
 ]
 
 [tool.pytest.ini_options]

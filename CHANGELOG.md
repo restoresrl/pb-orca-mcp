@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call — is **removed**; use `pb-format write` to write the file, then
   `pb_compile_entry_import` to import it. The `tomli` dependency is
   dropped. Tool count is 29.
+- Documentation consolidated: `docs/recipes.md` + `docs/workflow.md` merged
+  into a single [`docs/usage.md`](docs/usage.md). Internal development docs
+  (design plan, dev process, PBL binary-format reference) moved to a `dev/`
+  folder that is excluded from the published package; `CLAUDE.md` trimmed.
 
 ### Fixed
 

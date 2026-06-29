@@ -175,8 +175,8 @@ def pb_target_info(path: str | Path) -> dict[str, Any]:
     """MCP tool: structural info for a `.pbt` or `.pbw` file.
 
     Does NOT return `pb_version` — PB project files don't embed the
-    PowerBuilder release (see PLAN.md §"Parser .pbt / .pbw"). Selection of
-    the ORCA DLL is always explicit on `pb_session_open`.
+    PowerBuilder release. Selection of the ORCA DLL is always explicit on
+    `pb_session_open`.
     """
     return asdict(parse_pb_project_file(path))
 
