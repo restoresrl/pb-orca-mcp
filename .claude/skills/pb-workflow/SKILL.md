@@ -30,11 +30,13 @@ those text files — so on git projects the text form is canonical.
 3. Bootstrap the session (`pb_session_open` → `pb_set_library_list` →
    `pb_set_current_application`).
 4. Propagate to the `.pbl`. `pb-orca` never writes a `.sr*` itself — two
-   composable steps: write the SOT file with **`pb-format write`** (correct
-   header + encoding/BOM), then import it with **`pb_compile_entry_import`**
-   (its `syntax` must start with `$PBExportHeader$<name>.<ext>`). On failure,
-   fix the SOT file and retry — never patch the `.pbl` separately. Full
-   commands: `docs/usage.md` Recipe 1 / 1.5.
+   composable steps: write the SOT file yourself with the right byte layout
+   (line 1 `$PBExportHeader$<name>.<ext>`, CRLF, and the codec the `.pbw`
+   declares — pin it, don't let the editor pick), then import it with
+   **`pb_compile_entry_import`** (its `syntax` must also start with that
+   header line). On failure, fix the SOT file and retry — never patch the
+   `.pbl` separately. Full commands + the PowerShell write recipe:
+   `docs/usage.md` Recipe 1 / 1.5.
 5. **Integrity check** (only when adding/removing entries): compare
    `pb_library_directory` against the files in `ws_objects/<lib>.pbl.src/`;
    delete orphans from the `.pbl` (`pb_library_entry_delete`), import new
@@ -67,10 +69,10 @@ The `.pbl` is canonical; work in memory: bootstrap → `pb_library_entry_export`
   project — that pushes the derived form onto the SOT.
 - **Close PB IDE before ORCA writes** — it holds an exclusive lock on the `.pbl`.
 - **`pb_compile_entry_import` does not update `ws_objects/`** — you write the
-  SOT file yourself (`pb-format write`); ORCA writes the `.pbl`.
+  SOT file yourself (header + right codec, Recipe 1.5); ORCA writes the `.pbl`.
 - **Editors flip `.sr*` to UTF-8/LF** and break the BOM/encoding — write with
-  `pb-format write --encoding <UTF-8|UTF-16BOM|ANSI>` (match the `.pbw`
-  `DefaultExportEncode`), don't hand-encode. See `docs/usage.md` "Encoding caveat".
+  the codec pinned to the `.pbw` `DefaultExportEncode` (`UTF-8` / `UTF-16BOM`
+  / `ANSI`), don't let the editor choose. See `docs/usage.md` "Encoding caveat".
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically —
   check `git status` and revert unless you changed the target list.
 

@@ -1,7 +1,7 @@
 """Tests for `.pbt` and `.pbw` parsing in `pb_orca_mcp.tools.discovery`.
 
-Format documented in PLAN.md §"Parser .pbt / .pbw"; fixtures here are
-synthetic (no real customer paths committed, per public-repo hygiene).
+Format documented in DEVELOPMENT.md §"Formato .pbt / .pbw"; fixtures here
+are synthetic (no real customer paths committed, per public-repo hygiene).
 """
 
 from __future__ import annotations
@@ -152,7 +152,7 @@ def test_parse_rejects_unknown_extension(tmp_path: Path) -> None:
 
 def test_pb_target_info_returns_dict_without_pb_version(tmp_path: Path) -> None:
     """The MCP-facing tool returns a serializable dict and never includes
-    `pb_version` — see PLAN.md §"Decisioni di scope"."""
+    `pb_version` — see DEVELOPMENT.md §"Scope"."""
     p = tmp_path / "demo.pbt"
     p.write_text(
         "Save Format v3.0(19990112)\n"

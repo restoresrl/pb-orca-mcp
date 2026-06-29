@@ -2,7 +2,7 @@
 
 Istruzioni locali al progetto. **Lingua di lavoro: italiano.**
 Processo di sviluppo interno (release, restart, sibling, stato): vedi
-[`dev/DEVELOPMENT.md`](dev/DEVELOPMENT.md).
+[`DEVELOPMENT.md`](DEVELOPMENT.md).
 
 ## Contesto
 
@@ -34,7 +34,10 @@ un workflow agentico.
   `requires_pb`. Mock ammesso solo per unit test di parsing/discovery.
 - **Niente PowerGen / OrcaScript / .gen file.** Workflow batch legacy, fuori scope.
 - **Niente scrittura di file `.sr*` su disco.** Il server è puro ORCA (in-memory →
-  `.pbl`). La scrittura del SOT file è compito di `pb-format` (`pb-format write`).
+  `.pbl`). La scrittura del SOT file (header `$PBExportHeader$` + encoding/BOM +
+  CRLF) è fuori scope: la fa il chiamante con i propri strumenti (vedi
+  `docs/usage.md` Recipe 1.5). Questo repo è **indipendente** da qualsiasi tool
+  esterno per quel passo.
 
 ## Cose da tenere a mente (gotcha)
 
@@ -77,8 +80,6 @@ un workflow agentico.
 
 ## Riferimenti
 
-- Processo dev interno + stato: [`dev/DEVELOPMENT.md`](dev/DEVELOPMENT.md).
-- Design storico + decisioni residue PyPI: [`dev/PLAN.md`](dev/PLAN.md).
+- Processo dev interno + stato + design rationale: [`DEVELOPMENT.md`](DEVELOPMENT.md).
 - ORCA Programmers Guide R3: https://docs.appeon.com/pb2022r3/orca_guide
 - ORCA C header (ABI canonico): `<install>\SDK\ORCA\pborca.h`.
-- Layout binario PBL (reverse engineering): [`dev/pbl-file-format.txt`](dev/pbl-file-format.txt).

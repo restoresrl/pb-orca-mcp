@@ -74,9 +74,10 @@ Switching PB version = close + reopen (a process holds one PB runtime).
 - **Errors are data, not exceptions.** A failed compile returns
   `success: false` with populated `errors`; only genuine ORCA faults
   come back as an `error` envelope.
-- **Style is not this server's job.** To normalize indent / keyword case /
-  operator spacing, run the separate `pb-format` tool over the `.sr*`
-  files. pb-orca reads and writes through ORCA, nothing more.
+- **Style is not this server's job.** It imports `syntax` byte for byte and
+  won't normalize indent / keyword case / operator spacing. If that matters,
+  run a separate formatter over the `.sr*` before importing. pb-orca reads
+  and writes through ORCA, nothing more.
 
 ## When to reach for pb-workflow
 

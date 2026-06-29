@@ -19,33 +19,50 @@ If `pb-orca-mcp doctor` reports:
 
 > No PB install is usable from this Python (x64).
 
-… install an **x86 Python interpreter** alongside your existing one and
-re-create the `uvx` tool environment from it. Example with `uv`:
+… install an **x86 Python interpreter** alongside your existing one and run
+the server through it. Example with `uv`:
 
 ```pwsh
 # Install an x86 Python via uv
 uv python install 3.12 --arch x86
 
-# Recreate the pb-orca-mcp tool from that interpreter
+# Form A — pin x86 on the runner (no install):
+uvx --from .\pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
+
+# Form B — recreate the persistent tool from that interpreter:
 uv tool uninstall pb-orca-mcp
-uv tool install --python "3.12-x86" pb-orca-mcp
+uv tool install --python 3.12-x86 .\pb-orca-mcp
 ```
 
-With `pipx` the equivalent is `pipx install --python <path-to-x86-python.exe> pb-orca-mcp`.
+With `pipx` the Form B equivalent is
+`pipx install --python <path-to-x86-python.exe> .\pb-orca-mcp`.
 
 ## Install
 
+Not on PyPI yet — install from a clone of this repo. Two ways:
+
 ```pwsh
-uv tool install pb-orca-mcp
-# or:
-pipx install pb-orca-mcp
+git clone https://github.com/restoresrl/pb-orca-mcp
+
+# A. Run straight from source (recommended while unpublished) — no install
+#    step, always runs the current checkout. This is also the form the MCP
+#    config uses.
+uvx --from .\pb-orca-mcp pb-orca-mcp doctor
+
+# B. Or install it as a persistent tool so `pb-orca-mcp` is on PATH.
+#    Re-run after a `git pull` to pick up changes.
+uv tool install .\pb-orca-mcp          # or: pipx install .\pb-orca-mcp
 ```
 
-After install, the `pb-orca-mcp` command is on `PATH`.
+Once the package is published, both collapse to the package name
+(`uvx pb-orca-mcp` / `uv tool install pb-orca-mcp`).
 
 ## Verify
 
 ```pwsh
+# Form A:
+uvx --from .\pb-orca-mcp pb-orca-mcp doctor
+# Form B (after `uv tool install`):
 pb-orca-mcp doctor
 ```
 
@@ -118,10 +135,10 @@ DLL's PE `VS_VERSION_INFO` resource is read as a fallback.
 ## Uninstall
 
 ```pwsh
-uv tool uninstall pb-orca-mcp
-# or:
-pipx uninstall pb-orca-mcp
+# Form B (a persistent tool install):
+uv tool uninstall pb-orca-mcp        # or: pipx uninstall pb-orca-mcp
 ```
 
-The package owns no on-disk state — no caches, no config files. Removing
-the tool removes everything.
+Form A (`uvx --from`) installs nothing persistent — delete the clone, and
+optionally clear uv's build cache with `uv cache clean`. The package itself
+owns no on-disk state: no caches of its own, no config files.

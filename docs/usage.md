@@ -105,20 +105,31 @@ and `line` with the source it just submitted and iterates.
 When `ws_objects/<lib>.pbl.src/<entry>.<ext>` is the source of truth, you
 want **two** effects: the on-disk `.sr*` updated *and* the `.pbl`
 re-imported. `pb-orca-mcp` only does the second — it is a pure ORCA bridge
-and never writes a `.sr*` file. Use the standalone
-[`pb-format`](https://github.com/restoresrl/pb-format) tool for the first:
-it writes the canonical export header and the right encoding/BOM + CRLF —
-the byte layout PB IDE expects, which a plain editor gets wrong (stripped
-BOM, flipped line endings).
+and never writes a `.sr*` file. You write the SOT file yourself, with the
+exact byte layout PB IDE expects. A plain editor save gets this wrong
+(strips the BOM, flips CRLF→LF), which triggers a phantom-diff cascade on
+the next PB IDE Refresh — so write it deliberately, with the codec pinned.
 
-```sh
-# Step 1 — write the SOT file correctly (header + encoding). Body on stdin.
-pb-format write "C:\proj\ws_objects\myapp.pbl.src\f_compute_total.srf" \
-    --entry-name f_compute_total --ext srf --encoding UTF-8 \
-    --comments "fixed null-dereference in line 142" <<'BODY'
-global type f_compute_total ...
-...
-BODY
+The byte layout of a PB source file:
+
+- **Line 1** — `$PBExportHeader$<entry_name>.<ext>`
+  (e.g. `$PBExportHeader$f_compute_total.srf`).
+- **Body** — the object source, as `pb_library_entry_export` returns it.
+- **Line endings** — CRLF (`\r\n`) throughout.
+- **Encoding** — match the workspace `.pbw` `DefaultExportEncode`: UTF-16
+  LE + BOM (`FF FE`), UTF-8 + BOM (`EF BB BF`), or ANSI (no BOM).
+
+```pwsh
+# Step 1 — write the SOT file with the header + the right codec. Pin the
+# encoding explicitly; do not let the host editor choose it. UTF-16 LE+BOM
+# shown — for UTF-8 BOM use [System.Text.UTF8Encoding]::new($true),
+# for ANSI use [System.Text.Encoding]::Default.
+$header = '$PBExportHeader$f_compute_total.srf'
+$body   = ($body -split "`r?`n") -join "`r`n"            # normalize body to CRLF
+[System.IO.File]::WriteAllText(
+    'C:\proj\ws_objects\myapp.pbl.src\f_compute_total.srf',
+    ($header + "`r`n" + $body),
+    [System.Text.Encoding]::Unicode)
 ```
 
 ```jsonc
@@ -135,11 +146,12 @@ BODY
 
 Notes:
 
-- Match `--encoding` to the workspace `.pbw` `DefaultExportEncode`
-  (`UTF-8` / `UTF-16BOM` / `ANSI`). The wrong one triggers a phantom-diff
-  cascade on the next PB IDE Refresh (see Part 2 → Encoding caveat).
-- `pb-format` is also a Python library (`write_source_file`,
-  `build_source_text`) if you orchestrate this from code.
+- The codec must match the `.pbw` `DefaultExportEncode` (`UTF-8` /
+  `UTF-16BOM` / `ANSI`). The wrong one triggers a phantom-diff cascade on
+  the next PB IDE Refresh (see Part 2 → Encoding caveat).
+- The header line is required in **both** places: it's line 1 of the
+  on-disk `.sr*`, and it's the first line of the `syntax` you pass to
+  `compile_entry_import` (export strips it — import requires it).
 - A failed compile in Step 2 returns `success: false`; the SOT file from
   Step 1 stays written (SOT and the not-yet-fixed `.pbl` may diverge while
   you iterate).
@@ -356,9 +368,10 @@ pushes the derived form back onto the SOT — wrong direction).
 2. **Edit** the file.
 3. **Bootstrap** the session (see Part 1 → Session bootstrap).
 4. **Propagate to the `.pbl`** — read the edited file and import it with
-   `pb_compile_entry_import` (Recipe 1), or write it correctly first with
-   `pb-format write` (Recipe 1.5). On failure, fix the SOT file and retry
-   — never patch the `.pbl` separately.
+   `pb_compile_entry_import` (Recipe 1). When you write the SOT file from
+   scratch, emit the header + the right encoding/CRLF yourself first
+   (Recipe 1.5). On failure, fix the SOT file and retry — never patch the
+   `.pbl` separately.
 5. **Integrity check** (only when the change adds or removes entries):
    - `pb_library_directory` → entries in the `.pbl`; enumerate the files
      in `ws_objects/<lib>.pbl.src/`.
@@ -401,20 +414,19 @@ line endings — at which point `pb_scc_refresh_target` and
 `pb_compile_entry_import` fail, or PB re-exports the file on the next
 Refresh (phantom-diff cascade).
 
-**Recommended**: don't hand-encode. Write the file with
-[`pb-format write --encoding <UTF-8|UTF-16BOM|ANSI>`](https://github.com/restoresrl/pb-format)
-(Recipe 1.5) — it emits the right BOM + codec and rebuilds the canonical
-header. If you must reconvert by hand, normalize to CRLF and write with
-the matching codec (`[System.Text.UTF8Encoding]::new($true)` for UTF-8
-BOM, `[System.Text.Encoding]::Unicode` for UTF-16 LE BOM,
+**Recommended**: don't let the editor choose the encoding — write the file
+with the codec pinned, as in Recipe 1.5. Normalize the body to CRLF and
+write with the matching codec (`[System.Text.UTF8Encoding]::new($true)` for
+UTF-8 BOM, `[System.Text.Encoding]::Unicode` for UTF-16 LE BOM,
 `[System.Text.Encoding]::Default` for ANSI), then verify the first bytes.
 
-## Style normalization is a separate tool
+## Style normalization is out of scope
 
-`pb-orca-mcp` does not touch source style. To match PB IDE's formatting
-(indent, keyword case, operator spacing, line endings), run
-[`pb-format`](https://github.com/restoresrl/pb-format) over the `.sr*`
-files before importing. The two pair naturally; neither depends on the other.
+`pb-orca-mcp` does not touch source style. It imports whatever `syntax` you
+hand it, byte for byte — it won't reformat indentation, keyword case, or
+operator spacing to match PB IDE's conventions. If you care about matching
+that style, normalize the `.sr*` source with a separate formatter **before**
+importing; this server stays purely an ORCA bridge.
 
 ## Refresh PBL & native SCC sync (offline mode, git/svn)
 
@@ -488,8 +500,8 @@ check `git status` after a session and revert the `.pbw` if needed.
   derived form onto the SOT. Exception: recovery where the `.pbl` is known
   authoritative (a fix made in PB IDE on a machine without `ws_objects/`).
 - **`pb_compile_entry_import` does not update `ws_objects/`** (verified):
-  ORCA writes the `.pbl`; you handle the SOT file with your host tools (or
-  `pb-format write`).
+  ORCA writes the `.pbl`; you handle the SOT file with your host tools
+  (write it with the header + the right codec, Recipe 1.5).
 - **`pb_object_regenerate` is not "regenerate the `.src`"**: it re-emits
   internal p-code inside the `.pbl`, without touching the text file.
 - **The `.pbd` deployable stays stale until the next build** —

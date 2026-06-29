@@ -11,9 +11,9 @@ discovery, the MCP plumbing) is plain Python you can work on anywhere.
 - **Issues before large PRs.** Open an issue describing the change first
   for anything beyond a small fix, so we can agree on scope.
 - **Scope discipline.** This package wraps the ORCA API and nothing more.
-  Higher-level agentic workflows, skills and knowledge live in the
-  sibling `pb-ai-code` project. New features here should map to an ORCA
-  primitive or directly support the compile/build loop.
+  Higher-level agentic workflows, skills, and knowledge are out of scope —
+  they belong in a layer on top of this server. New features here should
+  map to an ORCA primitive or directly support the compile/build loop.
 - **No vendor- or workspace-specific assumptions.** No hardcoded user
   paths, no convention baked in from a single shop. The server must run
   on any Windows machine with a PB IDE installed.

@@ -10,18 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Refactored to keep `pb-orca-mcp` strictly an ORCA read/write server.
-  Two things that briefly lived here moved to the standalone,
-  ORCA-independent [`pb-format`](https://github.com/restoresrl/pb-format)
-  package: the PowerScript style formatter, and the well-formed `.sr*`
-  writer (export header + encoding/BOM). The short-lived
-  `pb_edit_and_import` tool — which wrote the `.sr*` and imported in one
-  call — is **removed**; use `pb-format write` to write the file, then
-  `pb_compile_entry_import` to import it. The `tomli` dependency is
-  dropped. Tool count is 29.
+  Two things that briefly lived here were removed: the PowerScript style
+  formatter, and the well-formed `.sr*` writer (export header +
+  encoding/BOM). The short-lived `pb_edit_and_import` tool — which wrote
+  the `.sr*` and imported in one call — is **removed**; the documented
+  workflow is now to write the `.sr*` yourself (header + encoding/BOM +
+  CRLF, see `docs/usage.md` Recipe 1.5), then call `pb_compile_entry_import`
+  to import it. The `tomli` dependency is dropped. Tool count is 29.
 - Documentation consolidated: `docs/recipes.md` + `docs/workflow.md` merged
   into a single [`docs/usage.md`](docs/usage.md). Internal development docs
-  (design plan, dev process, PBL binary-format reference) moved to a `dev/`
-  folder that is excluded from the published package; `CLAUDE.md` trimmed.
+  (dev process + design rationale) consolidated into a root `DEVELOPMENT.md`,
+  kept out of the published package; `CLAUDE.md` trimmed.
 
 ### Fixed
 

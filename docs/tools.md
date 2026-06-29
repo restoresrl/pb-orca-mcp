@@ -234,10 +234,10 @@ PB-style source text including the `$PBExportHeader$<name>.<ext>` first line.
 
 This imports `syntax` from memory into the `.pbl`; it does **not** write
 the `.sr*` source file on disk. To persist the on-disk source-of-truth
-correctly (canonical export header + the workspace encoding/BOM), use
-[`pb-format write`](https://github.com/restoresrl/pb-format) (or its
-`write_source_file` library function) before importing — plain editors
-tend to strip the BOM or flip line endings.
+correctly, write it yourself with the canonical export header + the
+workspace encoding/BOM + CRLF (plain editors tend to strip the BOM or flip
+line endings). The write recipe is in
+[`usage.md`](usage.md) Recipe 1.5.
 
 ### `pb_compile_entry_import_list(items)`
 

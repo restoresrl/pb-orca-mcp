@@ -3,13 +3,19 @@
 How to register `pb-orca-mcp` with Claude Code (or any other MCP client),
 including the arch-matching caveat that trips up most first-time installs.
 
+> **Not on PyPI yet.** Install from a clone (see
+> [`installation.md`](installation.md)). The snippets below run the server
+> straight from source with `uvx --from <clone>`, where `<clone>` is the
+> absolute path to your checkout (e.g. `C:\path\to\pb-orca-mcp`). Once the
+> package is published, drop `--from <clone>` and use the bare package name.
+
 ## 1. Verify your environment
 
 Before wiring anything into Claude Code, confirm `pb-orca-mcp` can see at
 least one PowerBuilder install from your terminal:
 
 ```pwsh
-pb-orca-mcp doctor
+uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp doctor
 ```
 
 A working setup ends with `Doctor OK: N usable install(s) for x86 Python.`
@@ -30,13 +36,15 @@ Add a `pb-orca` entry to one of:
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["pb-orca-mcp"]
+      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"]
     }
   }
 }
 ```
 
-The default install handles the common case of one PB IDE on the machine.
+`uvx --from <clone>` rebuilds and runs the current source on each launch —
+no reinstall after a `git pull`. This handles the common case of one PB IDE
+on the machine.
 
 ### When you have multiple PB versions installed
 
@@ -59,7 +67,7 @@ This is what Claude Code will do naturally when you tell it "use PB 2022 R3".
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["pb-orca-mcp"],
+      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"],
       "env": {
         "PB_INSTALL_PATH": "C:\\Program Files (x86)\\Appeon\\PowerBuilder 22.0"
       }
@@ -81,7 +89,7 @@ a specific x86 interpreter:
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["--python", "3.12-x86", "pb-orca-mcp"]
+      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "--python", "3.12-x86", "pb-orca-mcp"]
     }
   }
 }
@@ -101,9 +109,11 @@ After saving the config:
 You should see `pb-orca` listed under "Connected servers" with `29 tools`
 exposed. If `0 tools` or the server isn't listed, check:
 
-- The `command`/`args` resolve in your shell: `uvx pb-orca-mcp --help`
-  should print the click help.
-- `pb-orca-mcp doctor` (in your shell) exits 0.
+- The `command`/`args` resolve in your shell:
+  `uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp --help` should print the
+  click help.
+- `uvx --from C:\path\to\pb-orca-mcp pb-orca-mcp doctor` (in your shell)
+  exits 0.
 - Claude Code's MCP log: a failed server prints its stderr there.
 
 ## 4. Install the agent skills (recommended)
@@ -155,18 +165,27 @@ loop (Recipe 1) is the canonical first real workflow to try.
 
 ## 6. Combine with sources extracted from PB
 
-`pb-orca-mcp` doesn't replace Claude's normal file-edit capabilities. The
-common pattern is:
+`pb-orca-mcp` doesn't replace Claude's normal file-edit capabilities — it's
+the bridge that gets an edited source back into the `.pbl`. The common
+pattern on a git-managed project:
 
-1. PowerBuilder IDE has extracted sources into `ws_objects/src/<pbl>.pbl.src/`
-   (the standard PB export layout).
-2. Claude edits a `.srf` / `.sru` / `.srw` file using its normal `Edit`/`Write` tools.
-3. Claude calls `pb_compile_entry_import` with the edited file's contents
-   as `syntax` to import it back into the binary `.pbl`.
-4. Loop on `errors` until `success: true`.
+1. PowerBuilder IDE has extracted sources into `ws_objects/<lib>.pbl.src/`
+   (the standard PB export layout) — these text files are the source of
+   truth for git; the binary `.pbl` is the derived form.
+2. Claude reads and edits the `.srf` / `.sru` / `.srw` source.
+3. Claude writes the file back **with the PB byte layout intact** — header
+   line, CRLF, and the workspace's encoding/BOM. A naive `Write` save flips
+   the encoding to UTF-8/LF and breaks the file; pin the codec instead (see
+   [`usage.md`](usage.md) Recipe 1.5 and the Encoding caveat).
+4. Claude calls `pb_compile_entry_import` with that source as `syntax`
+   (which must start with the `$PBExportHeader$` line) to import it into the
+   `.pbl`, and loops on `errors` until `success: true`.
+5. Commit **both** the `.sr*` and the `.pbl` together.
 
-The `.pbl` is the source of truth for the PB IDE; `ws_objects/src/*` is
-the source of truth for git and for Claude. `pb-orca-mcp` is the bridge.
+The full source-of-truth discipline — which form is canonical, how to
+propagate in each direction, the add/delete integrity check — is the
+**`pb-workflow`** skill (and [`usage.md`](usage.md) Part 2). Install the
+skills (step 4) so Claude follows it automatically.
 
 ## Stopping the server
 

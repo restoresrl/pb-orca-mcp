@@ -17,9 +17,10 @@ What you'd like to see. If it maps to a specific ORCA function
 
 ## Scope check
 
-This project wraps the ORCA API and the compile/build loop. Higher-level
-agentic workflows, skills and ingested knowledge belong in the sibling
-`pb-ai-code` project. Does your request fit here, or there?
+This project wraps the ORCA API and the compile/build loop, and nothing
+more. Higher-level agentic workflows, skills, and ingested knowledge are
+out of scope here. Does your request map to an ORCA capability, or is it a
+layer that should sit on top of this server?
 
 ## Alternatives considered
 

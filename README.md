@@ -73,33 +73,40 @@ reads and writes PowerBuilder libraries.
 
 ## Quickstart
 
+Not on PyPI yet — install from a clone of this repo. (`uv` is the
+[Astral installer](https://docs.astral.sh/uv/); `pipx` works too.)
+
 ```pwsh
-# 1. Install (when published to PyPI)
-uv tool install pb-orca-mcp
-# or:
-pipx install pb-orca-mcp
+# 1. Clone, then run straight from source with uvx --from
+git clone https://github.com/restoresrl/pb-orca-mcp
+uvx --from .\pb-orca-mcp pb-orca-mcp doctor
 
-# 2. Verify the local PowerBuilder install(s) are detected
-pb-orca-mcp doctor
+#    If your PB IDE is x86 (the common case), pin an x86 Python:
+#    uvx --from .\pb-orca-mcp --python 3.12-x86 pb-orca-mcp doctor
 
-# 3. Wire it into Claude Code
+# 2. doctor should end with "Doctor OK: N usable install(s)".
+# 3. Wire it into Claude Code (below).
 ```
 
-In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide):
+In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide) —
+point `--from` at your clone (absolute path):
 
 ```json
 {
   "mcpServers": {
     "pb-orca": {
       "command": "uvx",
-      "args": ["pb-orca-mcp"]
+      "args": ["--from", "C:\\path\\to\\pb-orca-mcp", "pb-orca-mcp"]
     }
   }
 }
 ```
 
-After restarting Claude Code, `/mcp` should list the `pb_*` tools.
-Full setup walkthrough: [`docs/claude-code-setup.md`](docs/claude-code-setup.md).
+`uvx --from <clone>` builds and runs the current source each time — no
+reinstall after a `git pull`. Once the package is on PyPI this collapses to
+`"args": ["pb-orca-mcp"]`. After restarting Claude Code, `/mcp` should list
+the `pb_*` tools. Full setup walkthrough (x86 pinning, multi-version,
+troubleshooting): [`docs/claude-code-setup.md`](docs/claude-code-setup.md).
 
 ## Requirements
 
@@ -153,21 +160,20 @@ Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/u
 
 ## Status
 
-**v0.1.0 released** (2026-05-13); active development on `main` since.
-All ORCA primitives are wired through to MCP tools (29 total); ABI tested
-against PB 2022 R3 — the same set of prototypes covers any release since
-PB 2019 (ABI stable). 126 pytest tests green, plus 8 PB-dependent tests
-that skip without a local PB install, including the end-to-end
-compile-test loop validated with Claude Code driving the MCP server
-against a real PB 22.0 workspace. Since the tag, the codebase was
-refactored to keep this server purely ORCA: the PowerScript style
-formatter and the well-formed `.sr*` writer moved out to a separate,
-optional package (not included).
+Alpha, in active development on `main`. `v0.1.0` is **tagged** (GitHub
+release, 2026-05-13) but **not yet on PyPI** — install from source (see
+[Quickstart](#quickstart)).
 
-Currently in internal dogfooding. The package is being readied for a
-first PyPI publish (name reserved, MIT-licensed, CI green), but the
-public release is deliberately deferred until real-world use confirms
-stability — no fixed date.
+All of ORCA's public API is wired through to MCP tools (29 total). The ABI
+is verified against PB 2022 R3, and the same prototypes cover every release
+since PB 2019 (the ABI is stable) — PB 2019 R3 and 2025 are exercised too.
+The test suite is green, including an end-to-end compile-test loop run by
+Claude Code against a real PB 22.0 workspace; the PB-dependent tests skip
+cleanly when no local PB install is present.
+
+Currently in **internal dogfooding**: a public PyPI release (name reserved,
+MIT-licensed, CI green) is deliberately deferred until real-world use
+confirms stability — no fixed date.
 
 ## Documentation
 
