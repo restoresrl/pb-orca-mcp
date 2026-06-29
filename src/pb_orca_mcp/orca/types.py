@@ -88,7 +88,10 @@ class PBORCA_HIERARCHY(Structure):
 
 
 class PBORCA_REFERENCE(Structure):
-    """Callback record for `PBORCA_REFPROC` (`ObjectQueryReference` — outgoing refs of the queried object: what it calls/uses)."""
+    """Callback record for `PBORCA_REFPROC` (`ObjectQueryReference`).
+
+    Carries the outgoing refs of the queried object: what it calls/uses.
+    """
 
     _fields_ = [
         ("lpszLibraryName", c_wchar_p),

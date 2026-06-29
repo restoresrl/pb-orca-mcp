@@ -218,6 +218,30 @@ header block (PowerScript-escape with CRLF normalization), and
 imports atomically. Single tool call instead of edit + re-encode +
 import.
 
+### Optional: PowerScript style normalization
+
+`pb_edit_and_import` can also normalize the body it writes — indent,
+line endings, keyword case, operator spacing — so an agent's output
+matches what PB IDE would have written. This is **opt-in per workspace**:
+the formatter only runs once you commit a `.pb-format.toml` at (or above)
+the source directory.
+
+- `pb_edit_and_import` takes a `format` parameter, default `"auto"`:
+  `"auto"` formats only when a `.pb-format.toml` is discovered walking up
+  from `source_path` (so workspaces without that file behave exactly as
+  before — zero breaking change); `True` always formats (discovered
+  config or engine defaults); `False` never does. The response carries
+  `formatted: bool`.
+- The same engine is available offline as the `pb-format` CLI:
+  `pb-format detect` writes a starter config by sampling the workspace,
+  `pb-format format <paths>` normalizes `.sr*` files in place (preserving
+  header and encoding), and `pb-format check <paths>` reports drift
+  without writing (exit non-zero — handy in pre-commit / CI).
+
+The formatter is deliberately scope-limited (four invariants, no
+re-indent, no DataWindow `.srd`). Full contract, config reference, and
+rationale: [`formatter.md`](formatter.md).
+
 ### Passing large `syntax` strings
 
 `pb_compile_entry_import` accepts `syntax` inline in the tool call. The

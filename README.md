@@ -1,5 +1,9 @@
 # pb-orca-mcp
 
+[![CI](https://github.com/restoresrl/pb-orca-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/restoresrl/pb-orca-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
 MCP server that bridges Claude Code (and other MCP clients) to PowerBuilder
 via the ORCA API (`pborc.dll`, shipped with every PB IDE install). It works
 with **any PB version that exposes ORCA**. It lets an AI coding agent
@@ -102,13 +106,19 @@ Full design and rationale in [`PLAN.md`](PLAN.md).
 
 ## Status
 
-**v0.1.0 released** (2026-05-13). All ORCA primitives are wired through
-to MCP tools; ABI tested against PB 2022 R3 — same set of
-prototypes covers any release since PB 2019 (ABI stable). 107 pytest
-tests green, including the end-to-end compile-test loop validated with
-Claude Code driving the MCP server against a real PB 22.0 workspace.
+**v0.1.0 released** (2026-05-13); active development on `main` since.
+All ORCA primitives are wired through to MCP tools (30 total); ABI tested
+against PB 2022 R3 — the same set of prototypes covers any release since
+PB 2019 (ABI stable). 377 pytest tests green, plus 8 PB-dependent tests
+that skip without a local PB install, including the end-to-end
+compile-test loop validated with Claude Code driving the MCP server
+against a real PB 22.0 workspace. Since the tag: the `pb_edit_and_import`
+tool, an opt-in PowerScript body formatter, and the `pb-format` CLI.
 
-Next: first PyPI publish; community feedback round.
+Currently in internal dogfooding. The package is being readied for a
+first PyPI publish (name reserved, MIT-licensed, CI green), but the
+public release is deliberately deferred until real-world use confirms
+stability — no fixed date.
 
 ## Documentation
 

@@ -13,9 +13,9 @@ agentico.
 
 ## Stato
 
-**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 29 tool MCP che coprono
-il full ORCA loop. 107 pytest verdi incluso l'happy-path `requires_pb` su
-PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
+**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 30 tool MCP che coprono
+il full ORCA loop (l'ultimo, `pb_edit_and_import`, aggiunto dopo il tag).
+Suite pytest verde incluso l'happy-path `requires_pb` su PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
 con Claude Code in driver.
 
 Repo: https://github.com/restoresrl/pb-orca-mcp — **privato Restore

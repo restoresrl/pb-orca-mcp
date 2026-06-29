@@ -58,9 +58,18 @@ proof that on git projects the textual form is canonical.
      "syntax":           "<edited body — header optional>",
      "source_path":      "...\\ws_objects\\<lib>.pbl.src\\<entry>.<ext>",
      "comments":         "optional commit-style message",
-     "source_encoding":  "UTF-8"   // match the .pbw DefaultExportEncode
+     "source_encoding":  "UTF-8",  // match the .pbw DefaultExportEncode
+     "format":           "auto"    // normalize body if .pb-format.toml is present
    }
    ```
+
+   The `format` parameter (default `"auto"`) runs the optional
+   PowerScript body normalizer — but only when the workspace has opted
+   in by committing a `.pb-format.toml`. Without that file `"auto"` is a
+   no-op, so behaviour is unchanged for workspaces that don't use it. The
+   response includes `formatted: bool`. The same engine is exposed
+   offline as the `pb-format` CLI. See
+   `pb-orca-mcp/docs/formatter.md` for the contract and config.
 
    **Manual three-step form** — use when you want fine control over
    the encoding step, or when the SOT file is not under `ws_objects/`:
