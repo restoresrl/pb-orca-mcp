@@ -116,7 +116,7 @@ usable from the current Python interpreter.
 
 ## What it exposes
 
-Every function in ORCA's public API is mapped to one MCP tool. 30 tools
+Every function in ORCA's public API is mapped to one MCP tool. 29 tools
 total, grouped:
 
 | Group | Tools |
@@ -124,7 +124,7 @@ total, grouped:
 | Discovery | `pb_discover_pb_install`, `pb_target_info` |
 | Session | `pb_session_open`, `pb_session_close`, `pb_set_current_application`, `pb_set_library_list` |
 | Library | `pb_library_create`, `pb_library_delete`, `pb_library_directory`, `pb_library_entry_information`, `pb_library_entry_export`, `pb_library_entry_delete`, `pb_library_entry_move`, `pb_library_comment_modify` |
-| Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_edit_and_import`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
+| Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
 | Build | `pb_executable_create`, `pb_dynamic_library_create` |
 | Query | `pb_object_query_hierarchy`, `pb_object_query_reference`, `pb_object_regenerate` |
 | SCC | `pb_scc_connect_offline`, `pb_scc_set_target`, `pb_scc_refresh_target`, `pb_scc_exclude_library_list`, `pb_scc_get_connect_properties`, `pb_scc_close` |
@@ -157,14 +157,15 @@ Full design and rationale in [`PLAN.md`](PLAN.md).
 ## Status
 
 **v0.1.0 released** (2026-05-13); active development on `main` since.
-All ORCA primitives are wired through to MCP tools (30 total); ABI tested
+All ORCA primitives are wired through to MCP tools (29 total); ABI tested
 against PB 2022 R3 — the same set of prototypes covers any release since
-PB 2019 (ABI stable). 160 pytest tests green, plus 8 PB-dependent tests
+PB 2019 (ABI stable). 126 pytest tests green, plus 8 PB-dependent tests
 that skip without a local PB install, including the end-to-end
 compile-test loop validated with Claude Code driving the MCP server
-against a real PB 22.0 workspace. Since the tag: the `pb_edit_and_import`
-tool. The PowerScript style formatter that briefly lived here now ships
-separately as [`pb-format`](https://github.com/restoresrl/pb-format).
+against a real PB 22.0 workspace. Since the tag, the codebase was
+refactored to keep this server purely ORCA: both the PowerScript style
+formatter and the well-formed `.sr*` writer moved to the standalone
+[`pb-format`](https://github.com/restoresrl/pb-format) package.
 
 Currently in internal dogfooding. The package is being readied for a
 first PyPI publish (name reserved, MIT-licensed, CI green), but the

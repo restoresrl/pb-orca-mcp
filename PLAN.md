@@ -105,7 +105,6 @@ Cambio di target = close + reopen della sessione (più robusto che riusare la se
 | `pb_library_comment_modify` | `PBORCA_LibraryCommentModify` | Modifica il commento della PBL stessa |
 | `pb_compile_entry_import` | `PBORCA_CompileEntryImport` | Singola entry da source file |
 | `pb_compile_entry_import_list` | `PBORCA_CompileEntryImportList` | Batch import + compile |
-| `pb_edit_and_import` | (wraps `PBORCA_CompileEntryImport`) | Write `.sr*` su disco (encoding da `source_encoding` parameter — UTF-8 BOM default / UTF-16BOM / ANSI — + CRLF, header block `$PBExportHeader$` + `$PBExportComments$` rebuilt with PowerScript escape) + import atomico — sostituisce la sequenza edit+re-encode+import a 3 step |
 | `pb_application_rebuild` | `PBORCA_ApplicationRebuild` | Full/incremental/migrate (sostituisce `BuildProject*` deprecati in R3) |
 | `pb_executable_create` | `PBORCA_ExecutableCreate` | Build EXE, con PBR/icon/flag machine code |
 | `pb_dynamic_library_create` | `PBORCA_DynamicLibraryCreate` | Build PBD da una PBL |
@@ -355,7 +354,7 @@ Tutti i path relativi alla root del repository:
 ## Verifica end-to-end
 
 1. **Install**: `uv tool install pb-orca-mcp` su una Windows con almeno una PB IDE installazione. Comando `pb-orca-mcp doctor` deve passare (rileva DLL, conferma arch, lista tutte le install trovate).
-2. **Integrazione Claude Code**: aggiungere snippet a `~/.claude/mcp.json`, riavviare Claude Code, verificare che i 30 tool `pb_*` siano elencati in `/mcp`.
+2. **Integrazione Claude Code**: aggiungere snippet a `~/.claude/mcp.json`, riavviare Claude Code, verificare che i 29 tool `pb_*` siano elencati in `/mcp`.
 3. **Session smoke test**: prompt "apri sessione ORCA". Tool `pb_session_open` ritorna success con `pb_version: "22.0"` e `dll_path` valido.
 4. **Library inspection** (fixture): `pb_library_directory` su `tests/fixtures/tiny_app/main.pbl` → lista coerente con quello che PB IDE mostra (oggetti, tipi, comment).
 5. **Compile-test loop** (fixture): export di una function, modifica intenzionale rotta, `pb_compile_entry_import` → errori riportati con line/column corretti. Correggi, re-import → success.

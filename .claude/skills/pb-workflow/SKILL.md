@@ -43,47 +43,40 @@ proof that on git projects the textual form is canonical.
 
 4. Read the file you just edited and propagate to the `.pbl`.
 
-   **Preferred (single tool call)** — `pb_edit_and_import` writes the
-   SOT file with the workspace `DefaultExportEncode` (UTF-8 BOM by
-   default, UTF-16BOM or ANSI on demand) + CRLF, rebuilds the
-   canonical header block (`$PBExportHeader$` plus `$PBExportComments$`
-   when `comments` is non-empty, with PowerScript-escaped CRLF-
-   normalized content), and imports atomically:
+   `pb-orca` never writes a `.sr*` file — it only reads/writes through
+   ORCA. So this is two composable steps: write the SOT file with
+   `pb-format`, then import it with `pb-orca`.
 
-   ```jsonc
-   pb_edit_and_import {
-     "lib_path":         "...\\src\\<lib>.pbl",
-     "entry_name":       "<entry>",
-     "entry_type":       "<userobject|function|window|application|...>",
-     "syntax":           "<edited body — header optional>",
-     "source_path":      "...\\ws_objects\\<lib>.pbl.src\\<entry>.<ext>",
-     "comments":         "optional commit-style message",
-     "source_encoding":  "UTF-8"   // match the .pbw DefaultExportEncode
-   }
+   **Write the `.sr*` with `pb-format write`** — it writes the file with
+   the workspace `DefaultExportEncode` (UTF-8 BOM by default, UTF-16BOM
+   or ANSI on demand) + CRLF, and rebuilds the canonical
+   `$PBExportHeader$` / `$PBExportComments$` block. A plain editor would
+   strip the BOM or flip the line endings (see "Pitfalls").
+
+   ```sh
+   pb-format write "...\ws_objects\<lib>.pbl.src\<entry>.<ext>" \
+       --entry-name <entry> --ext <sru|srf|srw|...> --encoding UTF-8 \
+       --comments "optional message" <<'BODY'
+   <edited body — header optional>
+   BODY
    ```
 
-   Style normalization (indent, keyword case, operator spacing) is **not**
-   done by this server — use the standalone `pb-format` CLI over the
-   `.sr*` files if you want it.
-
-   **Manual three-step form** — use when you want fine control over
-   the encoding step, or when the SOT file is not under `ws_objects/`:
+   **Import into the `.pbl`** — `pb_compile_entry_import` requires the
+   `$PBExportHeader$` line as the first line of `syntax`:
 
    ```jsonc
-   // (4a) The agent edits the .sr* file via host tools.
-   // (4b) Re-encode the file to match the workspace DefaultExportEncode
-   //      (UTF-8 BOM by default — see "Pitfalls" below).
-   // (4c) Then call pb_compile_entry_import directly:
    pb_compile_entry_import {
      "lib_path": "...\\src\\<lib>.pbl",
      "entry_name": "<entry>",
      "entry_type": "<userobject|function|window|application|...>",
-     "syntax": "$PBExportHeader$<entry>.<ext>\r\n<full file content>"
+     "syntax": "$PBExportHeader$<entry>.<ext>\r\n<full body>"
    }
    ```
 
    Expect `{"success": true, "errors": []}`. On failure, fix the SOT
-   file and retry — never patch the `.pbl` separately.
+   file and retry — never patch the `.pbl` separately. Style
+   normalization (indent, keyword case, operator spacing) is also a
+   `pb-format` job (`pb-format format`), not this server's.
 
 5. **Integrity check** when adding or removing entries (skippable for a
    pure edit of one existing entry):
@@ -136,9 +129,9 @@ The `.pbl` is canonical. Work in memory.
   produce `.pbd` files.
 - **`pb_compile_entry_import` does not auto-update `ws_objects/`**
   (verified experimentally). On git projects you handle the SOT file
-  with your host tools; ORCA's job is the `.pbl`. **Mitigation**: use
-  `pb_edit_and_import` instead — it writes the SOT file and imports
-  in a single atomic call.
+  with your host tools; ORCA's job is the `.pbl`. **Mitigation**: write
+  the SOT file with `pb-format write` (correct header + BOM), then
+  import it with `pb_compile_entry_import`.
 - **Edit tools may flip `.sr*` files to UTF-8 no-BOM or LF on save**,
   or change the BOM away from the workspace `DefaultExportEncode`.
   PB rejects the file or re-exports it on the next Refresh
@@ -148,16 +141,17 @@ The `.pbl` is canonical. Work in memory.
   `[System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($true))`
   for UTF-8 BOM, `[System.Text.Encoding]::Unicode` for UTF-16 LE BOM,
   `[System.Text.Encoding]::Default` for ANSI. See `docs/workflow.md`
-  "Encoding caveat" for details. **Mitigation**: use
-  `pb_edit_and_import` with the matching `source_encoding` parameter —
-  it writes the right BOM + codec natively, no host-tool round-trip.
+  "Encoding caveat" for details. **Mitigation**: write the file with
+  `pb-format write --encoding <UTF-8|UTF-16BOM|ANSI>` — it emits the
+  right BOM + codec natively, no host-tool round-trip.
 - **Export/import asymmetry**: `pb_library_entry_export` returns the
   body only (no `$PBExportHeader$`, no `$PBExportComments$`);
   `pb_compile_entry_import` requires `$PBExportHeader$<name>.<ext>`
   as the first line of `syntax`. Re-prepend it manually for round-
-  trips. **Mitigation**: `pb_edit_and_import` rebuilds the canonical
-  header block (header + comments line + PowerScript-escaped CRLF-
-  normalized comment) automatically.
+  trips. **Mitigation**: `pb-format write` rebuilds the canonical header
+  block (header + comments line + PowerScript-escaped CRLF-normalized
+  comment) when it writes the file; for the import step, prepend
+  `$PBExportHeader$<name>.<ext>` to the body yourself.
 - **`pb_set_current_application` may rewrite `.pbw`** non-deterministically.
   Always check `git status` and revert unless you added a target.
 

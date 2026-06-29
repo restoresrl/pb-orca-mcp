@@ -210,13 +210,13 @@ After conversion, verify the first bytes match the target BOM (or the
 absence of one for ANSI). Validated 2026-05-22 against PB 22.0 on a
 clean `test-mcp` workspace.
 
-**Recommended alternative**: avoid the manual re-encode step entirely
-by calling `pb_edit_and_import` with the matching `source_encoding`
-parameter — the tool writes the file with the right BOM + codec,
-rebuilds the canonical `$PBExportHeader$` / `$PBExportComments$`
-header block (PowerScript-escape with CRLF normalization), and
-imports atomically. Single tool call instead of edit + re-encode +
-import.
+**Recommended alternative**: skip the manual re-encode entirely with the
+standalone [`pb-format`](https://github.com/restoresrl/pb-format) tool.
+`pb-format write` writes the file with the right BOM + codec and rebuilds
+the canonical `$PBExportHeader$` / `$PBExportComments$` block (PowerScript
+escape + CRLF normalization); then import it with
+`pb_compile_entry_import`. `pb-orca-mcp` itself never writes a `.sr*`
+file — it only reads and writes through ORCA.
 
 ### Style normalization is a separate tool
 

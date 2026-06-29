@@ -13,9 +13,9 @@ agentico.
 
 ## Stato
 
-**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 30 tool MCP che coprono
-il full ORCA loop (l'ultimo, `pb_edit_and_import`, aggiunto dopo il tag).
-Suite pytest verde incluso l'happy-path `requires_pb` su PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
+**v0.1.0 rilasciata** (tag `v0.1.0`, 2026-05-13). 29 tool MCP che coprono
+il full ORCA loop. Suite pytest verde incluso l'happy-path `requires_pb`
+su PB 22.0. Compile-test loop end-to-end validato sia da pytest sia da MCP
 con Claude Code in driver.
 
 Repo: https://github.com/restoresrl/pb-orca-mcp — **privato Restore
@@ -166,8 +166,10 @@ progetto separato, **indipendente da ORCA**. Era nato dentro
 `pb-orca-mcp` ma violava lo scope "puro ORCA" (conosce la sintassi del
 linguaggio e scrive file su disco), quindi è stato spostato.
 `pb-orca-mcp` **non** lo importa: sono due pacchetti componibili da chi
-li usa. `pb_edit_and_import` resta come write+import puro, senza
-formatting. Vedi [[sibling-pb-format]] in memory.
+li usa. La logica per scrivere un `.sr*` ben formato (header `$PBExport*` +
+encoding/BOM PB) vive in `pb-format` (`write_source_file` / `pb-format
+write`); `pb-orca` importa il source via ORCA con `pb_compile_entry_import`,
+senza toccare il filesystem. Vedi [[sibling-pb-format]] in memory.
 
 **`../pb-ai-code/`** (creato 2026-05-14, ancora in design phase): è il
 **dev kit agentico per PowerBuilder** che ha `pb-orca-mcp` come

@@ -98,7 +98,7 @@ After saving the config:
 2. Relaunch it (`claude` from the terminal).
 3. Run `/mcp` in the conversation.
 
-You should see `pb-orca` listed under "Connected servers" with `30 tools`
+You should see `pb-orca` listed under "Connected servers" with `29 tools`
 exposed. If `0 tools` or the server isn't listed, check:
 
 - The `command`/`args` resolve in your shell: `uvx pb-orca-mcp --help`

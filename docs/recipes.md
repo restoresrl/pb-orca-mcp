@@ -38,11 +38,11 @@ Each subsequent recipe assumes that bootstrap is already done.
 The inner loop of agentic PB development: an entry is broken, the agent
 edits the source, re-imports it, reads the compile errors, and iterates.
 
-**TL;DR — single-call form.** If you also want the on-disk `.sr*` file
-in `ws_objects/` updated alongside the `.pbl` import (the usual case
-when the workspace is the SOT), use `pb_edit_and_import` and skip
-Recipe 1.5 below. The three-step manual form here is documented for
-fine control or for callers that don't need to touch the SOT file.
+**Note — keeping the on-disk `.sr*` in sync.** This recipe imports from
+memory into the `.pbl`; it does not write the `ws_objects/<...>.sr*`
+file. When the workspace is the SOT and you need both updated, write the
+SOT file first with the standalone `pb-format` tool (it gets the export
+header + encoding/BOM right), then import — see Recipe 1.5.
 
 ```jsonc
 // Step 1: read the current source
@@ -88,62 +88,50 @@ PB IDE would show — line/column included. The agent can correlate
 
 ---
 
-## Recipe 1.5 — Atomic edit + import (single call)
+## Recipe 1.5 — Write the source-of-truth file, then import
 
-Same outcome as Recipe 1 but in a single tool call. Use this when the
-workspace's `ws_objects/<lib>.pbl.src/<entry_name>.<ext>` is the source
-of truth and must be kept in sync with the `.pbl`.
+When `ws_objects/<lib>.pbl.src/<entry_name>.<ext>` is the source of
+truth, you want **two** effects: the on-disk `.sr*` updated *and* the
+`.pbl` re-imported. `pb-orca-mcp` only does the second — it is a pure
+ORCA bridge and never writes a `.sr*` file. Use the standalone
+[`pb-format`](https://github.com/restoresrl/pb-format) tool for the
+first: it writes the canonical export header and the right encoding/BOM
++ CRLF — the byte layout PB IDE expects, which a plain editor gets wrong
+(stripped BOM, flipped line endings).
 
-```jsonc
-{"tool": "pb_edit_and_import", "args": {
-  "lib_path":    "C:\\proj\\myapp.pbl",
-  "entry_name":  "f_compute_total",
-  "entry_type":  "function",
-  // body only — the $PBExportHeader$ line will be prepended automatically
-  "syntax":      "global type f_compute_total ...\n...",
-  "source_path": "C:\\proj\\ws_objects\\myapp.pbl.src\\f_compute_total.srf",
-  "comments":    "fixed null-dereference in line 142"
-}}
-// → {
-//      "success": true,
-//      "lib_path":    "...",
-//      "entry_name":  "f_compute_total",
-//      "entry_type":  "function",
-//      "source_path": "...",
-//      "errors": []
-//    }
+```sh
+# Step 1 — write the SOT file correctly (header + encoding). Body on stdin.
+pb-format write "C:\proj\ws_objects\myapp.pbl.src\f_compute_total.srf" \
+    --entry-name f_compute_total --ext srf --encoding UTF-8 \
+    --comments "fixed null-dereference in line 142" <<'BODY'
+global type f_compute_total ...
+...
+BODY
 ```
 
-What the tool does atomically:
+```jsonc
+// Step 2 — import that source into the .pbl via ORCA.
+{"tool": "pb_compile_entry_import", "args": {
+  "lib_path":   "C:\\proj\\myapp.pbl",
+  "entry_name": "f_compute_total",
+  "entry_type": "function",
+  "syntax":     "$PBExportHeader$f_compute_total.srf\r\n<body>",
+  "comments":   "fixed null-dereference in line 142"
+}}
+// → {"success": true, "errors": []}
+```
 
-1. Resolves the on-disk extension from `entry_type` (`function` → `srf`,
-   `userobject` → `sru`, etc.).
-2. Strips any caller-supplied `$PBExportHeader$` / `$PBExportComments$`
-   from `syntax`, then rebuilds the canonical header block:
-   `$PBExportHeader$f_compute_total.srf\r\n` plus (if `comments` is
-   non-empty) `$PBExportComments$<escaped>\r\n` with PowerScript
-   escapes (`~r~n`, `~r`, `~n`, `~t`, `~~`) and CRLF normalization on
-   the comment.
-3. Writes the resulting text to `source_path` with the encoding
-   selected by `source_encoding` (default `"UTF-8"` → UTF-8 BOM; also
-   accepts `"UTF-16BOM"` and `"ANSI"` — match the workspace `.pbw`
-   `DefaultExportEncode`), CRLF endings (via temp file + atomic rename
-   on the same volume).
-4. Calls `PBORCA_CompileEntryImport` with `$PBExportHeader$` + body
-   (comment metadata travels via the separate `comments` parameter).
-5. Returns the unified `{success, errors}` plus the input echo.
+Notes:
 
-Failure modes:
-
-- `entry_type` has no canonical `.sr*` extension (`project`,
-  `proxyobject`, `binary`) → `PB_ORCA_MCP_INVALIDARGS`.
-- Filesystem error while writing (parent dir missing, permission
-  denied, disk full) → `PB_ORCA_MCP_IOERROR`. The `.pbl` is NOT
-  touched.
-- Compile diagnostics → `success: false` with populated `errors`, same
-  as `pb_compile_entry_import`. The on-disk file is still updated
-  (the SOT and the failed-compile `.pbl` may diverge intentionally
-  while you iterate).
+- Match `--encoding` to the workspace `.pbw` `DefaultExportEncode`
+  (`UTF-8` / `UTF-16BOM` / `ANSI`). The wrong one triggers a phantom-diff
+  cascade on the next PB IDE Refresh.
+- `pb-format` is also a Python library (`write_source_file`,
+  `build_source_text`) if you orchestrate this from code rather than the
+  CLI.
+- A failed compile in Step 2 returns `success: false` with `errors`; the
+  SOT file from Step 1 stays written (SOT and the not-yet-fixed `.pbl`
+  may diverge while you iterate).
 
 ---
 

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from pb_orca_mcp.orca.session import Session
@@ -41,17 +39,3 @@ def test_application_rebuild_unknown_type_without_session_returns_stateerror() -
 def test_get_last_compile_errors_no_session_returns_empty() -> None:
     out = compile_tools.pb_get_last_compile_errors()
     assert out == {"errors": []}
-
-
-def test_edit_and_import_without_session_returns_stateerror(
-    tmp_path: Path,
-) -> None:
-    """With no open session, edit_and_import fails the missing-session guard."""
-    out = compile_tools.pb_edit_and_import(
-        lib_path="foo.pbl",
-        entry_name="n_foo",
-        entry_type="userobject",
-        syntax="",
-        source_path=str(tmp_path / "n_foo.sru"),
-    )
-    assert out["error"]["name"] == "PB_ORCA_MCP_STATEERROR"

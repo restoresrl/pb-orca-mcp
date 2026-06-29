@@ -232,6 +232,13 @@ and surface as `success: false` with populated `errors`.
 Compile + import a single entry's source into a PBL. `syntax` is the full
 PB-style source text including the `$PBExportHeader$<name>.<ext>` first line.
 
+This imports `syntax` from memory into the `.pbl`; it does **not** write
+the `.sr*` source file on disk. To persist the on-disk source-of-truth
+correctly (canonical export header + the workspace encoding/BOM), use
+[`pb-format write`](https://github.com/restoresrl/pb-format) (or its
+`write_source_file` library function) before importing — plain editors
+tend to strip the BOM or flip line endings.
+
 ### `pb_compile_entry_import_list(items)`
 
 Batch version. `items` is a list of dicts:
@@ -247,75 +254,6 @@ Batch version. `items` is a list of dicts:
   }
 ]
 ```
-
-### `pb_edit_and_import(lib_path, entry_name, entry_type, syntax, source_path, comments="", source_encoding="UTF-8")`
-
-Atomic write-then-import. Persists `syntax` to `source_path` on disk
-with the encoding PB IDE writes for the workspace, rebuilds the
-canonical PB IDE export header block, and then imports `syntax` into
-`lib_path`.
-
-`source_encoding` accepts one of the three values PB IDE writes in the
-`.pbw` `DefaultExportEncode` directive:
-
-- `"UTF-8"` — UTF-8 with BOM (`EF BB BF`). Default in PB 2022 and
-  observed across every Restore workspace surveyed.
-- `"UTF-16BOM"` — UTF-16 LE with BOM (`FF FE`). PB legacy default
-  pre-2019.
-- `"ANSI"` — system codepage, no BOM. Older Windows workspaces only.
-
-The caller should read `DefaultExportEncode` from the target's `.pbw`
-and pass the matching value. Mismatched encoding silently triggers a
-refresh cascade in PB IDE: the IDE re-exports the file using the
-workspace's configured encoding on the next Refresh, producing a
-"phantom" diff against what the tool wrote. ORCA itself is
-encoding-agnostic — strings cross the C ABI as wide chars — so
-`source_encoding` only affects the on-disk representation.
-
-The header block is reconstructed from scratch on every call:
-
-- Line 1: `$PBExportHeader$<entry_name>.<ext>`
-- Line 2 (only when `comments` is non-empty):
-  `$PBExportComments$<escaped>` where `<escaped>` applies PowerScript
-  escape sequences to control characters — `~r` for CR, `~n` for LF
-  (so a CRLF-bearing comment becomes `…~r~n…`), `~t` for TAB, and
-  `~~` for `~` itself. Before escape, the `comments` string is
-  normalized so every newline style (CRLF / LF / CR) is stored as
-  CRLF; otherwise the Library Painter Properties dialog would render
-  bare LF without a visible line break (Windows multi-line edit
-  control behavior). The end result matches PB IDE's own export
-  format byte for byte, so the IDE's next Refresh on the entry is a
-  no-op rather than triggering an import + compile + regenerate
-  cascade.
-
-Any `$PBExportHeader$` / `$PBExportComments$` lines the caller leaves
-at the top of `syntax` are stripped before rebuild — the `comments`
-parameter is the single source of truth for entry comment metadata.
-
-Replaces the three-step "agent writes file + agent re-encodes + agent
-calls `pb_compile_entry_import`" pattern with a single call. Same
-response shape as `pb_compile_entry_import` plus `source_path` echoed
-back. A `UnicodeEncodeError` (text contains characters outside the
-chosen codepage, typically with `"ANSI"`) surfaces as
-`PB_ORCA_MCP_ENCODINGERROR`.
-
-The on-disk extension is derived from `entry_type` via the
-`ENTRY_TYPE_EXTENSIONS` map in `pb_orca_mcp.orca.constants` (`sru`,
-`srw`, `srf`, `srd`, `srm`, `srs`, `sra`, `srp`, `srq`). Entry types
-without a canonical source extension (`project`, `proxyobject`,
-`binary`) raise `PB_ORCA_MCP_INVALIDARGS`.
-
-`source_path` parent directories must already exist; the write is
-atomic (temp-file + replace on the same volume). On filesystem error
-the tool returns `PB_ORCA_MCP_IOERROR`.
-
-`pb-orca-mcp` does not normalize source style. To match PB IDE's
-formatting (indent, keyword case, operator spacing, line endings), run
-the standalone [`pb-format`](https://github.com/restoresrl/pb-format)
-tool over the `.sr*` files before importing.
-
-**Output**: `{"success", "lib_path", "entry_name", "entry_type",
-"source_path", "errors": [...]}`.
 
 ### `pb_application_rebuild(rebuild_type="incremental")`
 

@@ -55,7 +55,6 @@ _TOOLS: tuple[tuple[Callable[..., object], str], ...] = (
     # Compile
     (compile_tools.pb_compile_entry_import, "pb_compile_entry_import"),
     (compile_tools.pb_compile_entry_import_list, "pb_compile_entry_import_list"),
-    (compile_tools.pb_edit_and_import, "pb_edit_and_import"),
     (compile_tools.pb_application_rebuild, "pb_application_rebuild"),
     (compile_tools.pb_get_last_compile_errors, "pb_get_last_compile_errors"),
     # Build artifacts

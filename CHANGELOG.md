@@ -7,22 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `pb_edit_and_import` MCP tool: atomic write-then-import for a single
-  entry. Persists `syntax` to disk in the workspace export encoding,
-  rebuilds the `$PBExportHeader$` / `$PBExportComments$` block, then
-  imports — replacing the three-step edit + re-encode + import pattern.
-
 ### Changed
 
-- The PowerScript style formatter that briefly lived here was extracted
-  into a separate, ORCA-independent project,
-  [`pb-format`](https://github.com/restoresrl/pb-format). `pb-orca-mcp`
-  is now strictly an ORCA read/write server and does not format source.
-  `pb_edit_and_import` no longer takes a `format` parameter or returns
-  `formatted`; run `pb-format` over the `.sr*` files separately for
-  style normalization. The `tomli` dependency is dropped with it.
+- Refactored to keep `pb-orca-mcp` strictly an ORCA read/write server.
+  Two things that briefly lived here moved to the standalone,
+  ORCA-independent [`pb-format`](https://github.com/restoresrl/pb-format)
+  package: the PowerScript style formatter, and the well-formed `.sr*`
+  writer (export header + encoding/BOM). The short-lived
+  `pb_edit_and_import` tool — which wrote the `.sr*` and imported in one
+  call — is **removed**; use `pb-format write` to write the file, then
+  `pb_compile_entry_import` to import it. The `tomli` dependency is
+  dropped. Tool count is 29.
 
 ### Fixed
 
