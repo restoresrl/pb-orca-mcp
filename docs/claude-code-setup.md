@@ -134,8 +134,9 @@ Copy-Item -Recurse .claude/skills/pb-workflow ~/.claude/skills/
 
 Without the skills Claude can still call every tool; with them it knows
 the session order, the export-header requirement, and the source-of-truth
-model up front — fewer wrong turns. Restart Claude Code after copying, and
-check `/skills` lists them.
+model up front — fewer wrong turns. Restart Claude Code after copying. To
+confirm they loaded, run `/skills` (recent versions) — or just type `/`
+and look for them in the command menu, which works on any version.
 
 ## 5. First prompt to try
 
