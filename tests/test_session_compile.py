@@ -61,30 +61,57 @@ class _FakeCompile:
             errproc(ctypes.pointer(rec), None)
 
     def CompileEntryImport(
-        self, handle: int, lib: str, entry: str, type_code: int,
-        comments: str, syntax: str, size: int, errproc: Any, user: Any,
+        self,
+        handle: int,
+        lib: str,
+        entry: str,
+        type_code: int,
+        comments: str,
+        syntax: str,
+        size: int,
+        errproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("CompileEntryImport", (handle, lib, entry, type_code, comments, size)))
         self._replay(errproc)
         return self.rc
 
     def CompileEntryImportList(
-        self, handle: int, libs: Any, names: Any, types: Any, comments: Any,
-        syntaxes: Any, sizes: Any, n: int, errproc: Any, user: Any,
+        self,
+        handle: int,
+        libs: Any,
+        names: Any,
+        types: Any,
+        comments: Any,
+        syntaxes: Any,
+        sizes: Any,
+        n: int,
+        errproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("CompileEntryImportList", (handle, n)))
         self._replay(errproc)
         return self.rc
 
     def CompileEntryRegenerate(
-        self, handle: int, lib: str, entry: str, type_code: int, errproc: Any, user: Any,
+        self,
+        handle: int,
+        lib: str,
+        entry: str,
+        type_code: int,
+        errproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("CompileEntryRegenerate", (handle, lib, entry, type_code)))
         self._replay(errproc)
         return self.rc
 
     def ApplicationRebuild(
-        self, handle: int, type_code: int, errproc: Any, user: Any,
+        self,
+        handle: int,
+        type_code: int,
+        errproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("ApplicationRebuild", (handle, type_code)))
         self._replay(errproc)
@@ -147,17 +174,13 @@ def test_compile_entry_import_other_error_raises(open_session: Session) -> None:
     api = open_session._state.api  # type: ignore[union-attr]
     api.compile.rc = PBORCA_LIBLISTNOTSET
     with pytest.raises(OrcaError) as ei:
-        open_session.compile_entry_import(
-            "foo.pbl", "n_cst_main", "userobject", "fake source"
-        )
+        open_session.compile_entry_import("foo.pbl", "n_cst_main", "userobject", "fake source")
     assert ei.value.code == PBORCA_LIBLISTNOTSET
 
 
 def test_compile_entry_import_unknown_type_raises(open_session: Session) -> None:
     with pytest.raises(ValueError, match="unknown entry type"):
-        open_session.compile_entry_import(
-            "foo.pbl", "f_demo", "bogus", "fake source"
-        )
+        open_session.compile_entry_import("foo.pbl", "f_demo", "bogus", "fake source")
 
 
 def test_compile_entry_import_list_passes_count(open_session: Session) -> None:
@@ -193,9 +216,7 @@ def test_compile_entry_regenerate_passes_args(open_session: Session) -> None:
 
 
 def test_callback_refs_emptied_after_call(open_session: Session) -> None:
-    open_session.compile_entry_import(
-        "foo.pbl", "f_demo", "function", "src"
-    )
+    open_session.compile_entry_import("foo.pbl", "f_demo", "function", "src")
     state = open_session._state  # type: ignore[union-attr]
     assert state.callback_refs == []
 

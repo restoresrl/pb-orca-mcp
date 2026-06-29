@@ -114,7 +114,7 @@ class TestOperatorSpacing:
 
     def test_continuation_amp_not_spaced(self) -> None:
         # `&` at EOL is a continuation marker, not a binary operator.
-        src = "string ls = ~\r\n  &\r\n  \"continued\"\r\n"
+        src = 'string ls = ~\r\n  &\r\n  "continued"\r\n'
         out = format_powerscript(src, _cfg())
         assert "& " not in out
         assert " &" not in out.replace(" &\r\n", "")  # tolerate "  &\r\n"

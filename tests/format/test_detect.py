@@ -25,25 +25,14 @@ class TestDetect:
         assert result.config == FormatConfig.default()
 
     def test_tabs_dominate(self, tmp_path: Path) -> None:
-        body = (
-            "if a then\r\n"
-            "\tif b then\r\n"
-            "\t\treturn 1\r\n"
-            "\tend if\r\n"
-            "end if\r\n"
-        )
+        body = "if a then\r\n\tif b then\r\n\t\treturn 1\r\n\tend if\r\nend if\r\n"
         _make_source(tmp_path / "n_foo.sru", body)
         result = detect_workspace_style(tmp_path)
         assert result.config.indent_style == "tab"
         assert result.indent_votes.get("tab", 0) > 0
 
     def test_two_space_indent_detected(self, tmp_path: Path) -> None:
-        body = (
-            "if a then\r\n"
-            "  return 1\r\n"
-            "    return 2\r\n"
-            "      return 3\r\n"
-        )
+        body = "if a then\r\n  return 1\r\n    return 2\r\n      return 3\r\n"
         _make_source(tmp_path / "n_foo.sru", body)
         result = detect_workspace_style(tmp_path)
         # Vote breakdown: 2 → spaces:2, 4 → spaces:4, 6 → spaces:2 (6%2==0

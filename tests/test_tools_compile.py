@@ -65,9 +65,7 @@ def test_edit_and_import_bad_config_file_returns_invalidargs(
     """A malformed `.pb-format.toml` walking up surfaces as INVALIDARGS."""
     from pb_orca_mcp.format import CONFIG_FILENAME
 
-    (tmp_path / CONFIG_FILENAME).write_text(
-        '[style]\nindent = "soft-tab"\n', encoding="utf-8"
-    )
+    (tmp_path / CONFIG_FILENAME).write_text('[style]\nindent = "soft-tab"\n', encoding="utf-8")
     out = compile_tools.pb_edit_and_import(
         lib_path="foo.pbl",
         entry_name="n_foo",

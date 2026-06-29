@@ -25,9 +25,7 @@ from pb_orca_mcp.orca.errors import OrcaError
 from pb_orca_mcp.orca.session import Session, SessionStateError
 
 
-def pb_object_query_hierarchy(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_object_query_hierarchy(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """Walk the ancestor chain of a single entry."""
     session = Session.instance()
     try:
@@ -46,9 +44,7 @@ def pb_object_query_hierarchy(
     }
 
 
-def pb_object_query_reference(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_object_query_reference(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """List every entry that references the named object."""
     session = Session.instance()
     try:
@@ -68,9 +64,7 @@ def pb_object_query_reference(
     }
 
 
-def pb_object_regenerate(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_object_regenerate(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """Re-emit object code for a single entry. Returns `{success, errors}`."""
     session = Session.instance()
     try:

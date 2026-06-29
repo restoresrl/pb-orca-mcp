@@ -87,9 +87,7 @@ def test_connect_offline_tolerates_workspace_without_scc_block(
     """git/svn `.pbw` has no SCC block — pre-read fails with -23/-31 but connect proceeds."""
     stub = _StubSession(get_connect_returns=tolerated_code)
     monkeypatch.setattr(Session, "instance", classmethod(lambda cls: stub))
-    out = scc_tools.pb_scc_connect_offline(
-        workspace_file="ws.pbw", local_proj_path="C:\\proj"
-    )
+    out = scc_tools.pb_scc_connect_offline(workspace_file="ws.pbw", local_proj_path="C:\\proj")
     assert out["ok"] is True
     assert stub.connect_offline_called_with is not None
     assert stub.connect_offline_called_with["local_proj_path"] == "C:\\proj"

@@ -67,9 +67,7 @@ class _FakeScc:
         }
     )
     """Fields written into the struct by `SccGetConnectProperties`."""
-    set_target_libraries: list[str] = field(
-        default_factory=lambda: ["a.pbl", "b.pbl"]
-    )
+    set_target_libraries: list[str] = field(default_factory=lambda: ["a.pbl", "b.pbl"])
     """Library names emitted by the `SccSetTarget` callback (in order)."""
     calls: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
 
@@ -176,9 +174,7 @@ def test_scc_get_connect_properties_returns_struct_as_dict(
     assert out["comment_max_len"] == 256
     assert out["delete_temp_files"] is True
     assert out["append_log"] is False
-    assert api.scc.calls[0] == (
-        "SccGetConnectProperties", (0xDEADBEEF, "C:\\proj\\ws.pbw")
-    )
+    assert api.scc.calls[0] == ("SccGetConnectProperties", (0xDEADBEEF, "C:\\proj\\ws.pbw"))
 
 
 def test_scc_get_connect_properties_propagates_error(

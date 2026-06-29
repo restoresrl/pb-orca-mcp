@@ -39,7 +39,7 @@ _SAMPLES: list[str] = [
     "// just a comment\r\n",
     "/* block\r\n   spanning\r\n   lines */\r\n",
     "n_foo.Integer = 1\r\n",  # member access shadowing
-    "string ls = ~\r\n  &\r\n  \"continued\"\r\n",  # continuation
+    'string ls = ~\r\n  &\r\n  "continued"\r\n',  # continuation
     "li = a + b * c - d / e ^ 2\r\n",
     "if a<=b and c<>d then return\r\n",
     "    a = 1\r\n        b = 2\r\n",
@@ -68,22 +68,17 @@ def test_format_is_idempotent(source: str, config: FormatConfig) -> None:
 def test_already_formatted_source_unchanged(config: FormatConfig) -> None:
     """A source that already matches the config must be a fixed point."""
     if config.indent_style == "tab":
-        canonical = (
-            "if a > b then\r\n"
-            "\treturn 1\r\n"
-            "end if\r\n"
-        )
+        canonical = "if a > b then\r\n\treturn 1\r\nend if\r\n"
     else:
         indent = " " * config.indent_spaces
-        canonical = (
-            "if a > b then\r\n"
-            f"{indent}return 1\r\n"
-            "end if\r\n"
-        )
+        canonical = f"if a > b then\r\n{indent}return 1\r\nend if\r\n"
     if config.keyword_case == "upper":
-        canonical = canonical.replace("if", "IF").replace("then", "THEN").replace(
-            "return", "RETURN"
-        ).replace("end IF", "END IF")
+        canonical = (
+            canonical.replace("if", "IF")
+            .replace("then", "THEN")
+            .replace("return", "RETURN")
+            .replace("end IF", "END IF")
+        )
     if not config.spaces_around_operators:
         canonical = canonical.replace("a > b", "a>b")
     out = format_powerscript(canonical, config)

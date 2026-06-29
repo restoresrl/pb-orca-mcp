@@ -127,12 +127,7 @@ def _escape_pb_comment(text: str) -> str:
     PBL metadata exports as `~r~n`). The `~` escape must be applied
     first to avoid double-escaping.
     """
-    return (
-        text.replace("~", "~~")
-        .replace("\r", "~r")
-        .replace("\n", "~n")
-        .replace("\t", "~t")
-    )
+    return text.replace("~", "~~").replace("\r", "~r").replace("\n", "~n").replace("\t", "~t")
 
 
 def _strip_export_headers(syntax: str) -> str:
@@ -383,9 +378,7 @@ class Session:
             "comment": _strip_buffer(info.szComments),
         }
 
-    def library_entry_export(
-        self, lib_path: str, entry_name: str, entry_type: str
-    ) -> str:
+    def library_entry_export(self, lib_path: str, entry_name: str, entry_type: str) -> str:
         """`PBORCA_LibraryEntryExportEx` with auto-resizing buffer.
 
         Starts at 64 KiB; if ORCA returns `PBORCA_BUFFERTOOSMALL`, reads the
@@ -408,9 +401,7 @@ class Session:
             raise self._build_error(rc)
         raise self._build_error(PBORCA_BUFFERTOOSMALL)
 
-    def library_entry_delete(
-        self, lib_path: str, entry_name: str, entry_type: str
-    ) -> None:
+    def library_entry_delete(self, lib_path: str, entry_name: str, entry_type: str) -> None:
         """`PBORCA_LibraryEntryDelete(handle, lib, entry, type)`."""
         state = self._require_open("library_entry_delete")
         type_code = entry_type_from_name(entry_type)
@@ -462,8 +453,15 @@ class Session:
         callback, errors = self._make_errproc(state)
         try:
             rc = state.api.compile.CompileEntryImport(
-                state.handle, lib_path, entry_name, type_code, comments,
-                syntax, len(syntax) * 2, callback, None,
+                state.handle,
+                lib_path,
+                entry_name,
+                type_code,
+                comments,
+                syntax,
+                len(syntax) * 2,
+                callback,
+                None,
             )
         finally:
             self._drop_callback(state, callback)
@@ -490,8 +488,16 @@ class Session:
         callback, errors = self._make_errproc(state)
         try:
             rc = state.api.compile.CompileEntryImportList(
-                state.handle, libs, names, types, comments, syntaxes, sizes,
-                n, callback, None,
+                state.handle,
+                libs,
+                names,
+                types,
+                comments,
+                syntaxes,
+                sizes,
+                n,
+                callback,
+                None,
             )
         finally:
             self._drop_callback(state, callback)
@@ -651,9 +657,7 @@ class Session:
         type_code = rebuild_type_from_name(rebuild_type)
         callback, errors = self._make_errproc(state)
         try:
-            rc = state.api.compile.ApplicationRebuild(
-                state.handle, type_code, callback, None
-            )
+            rc = state.api.compile.ApplicationRebuild(state.handle, type_code, callback, None)
         finally:
             self._drop_callback(state, callback)
         return self._compile_result(state, rc, errors)
@@ -773,9 +777,16 @@ class Session:
         callback, errors = self._make_linkproc(state)
         try:
             rc = state.api.build.ExecutableCreate(
-                state.handle, exe_name, icon_name, pbr_name,
-                callback, None,
-                pbd_array, num_pbd, flag_int, None,
+                state.handle,
+                exe_name,
+                icon_name,
+                pbr_name,
+                callback,
+                None,
+                pbd_array,
+                num_pbd,
+                flag_int,
+                None,
             )
         finally:
             self._drop_callback(state, callback)
@@ -792,15 +803,11 @@ class Session:
         """`PBORCA_DynamicLibraryCreate(handle, lib, pbr, lFlags, NULL)` — build a single PBD."""
         state = self._require_open("build_dynamic_library")
         flag_int = build_flags_from_names(flags)
-        rc = state.api.build.DynamicLibraryCreate(
-            state.handle, lib_path, pbr_name, flag_int, None
-        )
+        rc = state.api.build.DynamicLibraryCreate(state.handle, lib_path, pbr_name, flag_int, None)
         if rc != PBORCA_OK:
             raise self._build_error(rc)
 
-    def object_query_hierarchy(
-        self, lib_path: str, entry_name: str, entry_type: str
-    ) -> list[str]:
+    def object_query_hierarchy(self, lib_path: str, entry_name: str, entry_type: str) -> list[str]:
         """`PBORCA_ObjectQueryHierarchy` — return the ancestor chain as a list of names.
 
         Order is the order the callback delivers entries (closest ancestor
@@ -917,9 +924,7 @@ class Session:
         state.scc_connected = True
         return _scc_struct_to_dict(scc)
 
-    def scc_set_target(
-        self, target_file: str, flags: list[str] | None = None
-    ) -> list[str]:
+    def scc_set_target(self, target_file: str, flags: list[str] | None = None) -> list[str]:
         """`PBORCA_SccSetTarget(handle, targetFile, lFlags, cb, NULL)`.
 
         Returns the list of library names the callback emitted (one per
@@ -937,9 +942,7 @@ class Session:
         callback = PBORCA_SETTGTPROC(_on_lib)
         state.callback_refs.append(callback)
         try:
-            rc = state.api.scc.SccSetTarget(
-                state.handle, target_file, flag_int, callback, None
-            )
+            rc = state.api.scc.SccSetTarget(state.handle, target_file, flag_int, callback, None)
         finally:
             self._drop_callback(state, callback)
         if rc != PBORCA_OK:

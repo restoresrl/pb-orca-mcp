@@ -59,8 +59,17 @@ class _FakeBuild:
         return PBORCA_OK
 
     def ExecutableCreate(
-        self, handle: int, exe: str, icon: str | None, pbr: str | None,
-        linkproc: Any, user: Any, pbd_arr: Any, n_pbd: int, lflags: int, pbcpara: Any,
+        self,
+        handle: int,
+        exe: str,
+        icon: str | None,
+        pbr: str | None,
+        linkproc: Any,
+        user: Any,
+        pbd_arr: Any,
+        n_pbd: int,
+        lflags: int,
+        pbcpara: Any,
     ) -> int:
         self.calls.append(("ExecutableCreate", (handle, exe, icon, pbr, n_pbd, lflags)))
         self._live.clear()
@@ -72,13 +81,24 @@ class _FakeBuild:
         return self.exe_rc
 
     def DynamicLibraryCreate(
-        self, handle: int, lib: str, pbr: str | None, lflags: int, pbcpara: Any,
+        self,
+        handle: int,
+        lib: str,
+        pbr: str | None,
+        lflags: int,
+        pbcpara: Any,
     ) -> int:
         self.calls.append(("DynamicLibraryCreate", (handle, lib, pbr, lflags)))
         return self.pbd_rc
 
     def ObjectQueryHierarchy(
-        self, handle: int, lib: str, entry: str, type_code: int, hierproc: Any, user: Any,
+        self,
+        handle: int,
+        lib: str,
+        entry: str,
+        type_code: int,
+        hierproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("ObjectQueryHierarchy", (handle, lib, entry, type_code)))
         self._live.clear()
@@ -90,7 +110,13 @@ class _FakeBuild:
         return self.hier_rc
 
     def ObjectQueryReference(
-        self, handle: int, lib: str, entry: str, type_code: int, refproc: Any, user: Any,
+        self,
+        handle: int,
+        lib: str,
+        entry: str,
+        type_code: int,
+        refproc: Any,
+        user: Any,
     ) -> int:
         self.calls.append(("ObjectQueryReference", (handle, lib, entry, type_code)))
         self._live.clear()

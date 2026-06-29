@@ -75,9 +75,7 @@ class FormatConfig:
 
         line_endings_raw = style_section.get("line_endings", "crlf")
         if line_endings_raw not in ("crlf", "lf"):
-            raise ValueError(
-                f"line_endings must be 'crlf' or 'lf' (got {line_endings_raw!r})"
-            )
+            raise ValueError(f"line_endings must be 'crlf' or 'lf' (got {line_endings_raw!r})")
         line_endings: LineEndings = line_endings_raw
 
         spaces_around = style_section.get("spaces_around_operators", True)

@@ -30,9 +30,7 @@ class TestModeFalse:
 
 
 class TestModeAutoNoConfig:
-    def test_returns_none_when_walking_up_finds_nothing(
-        self, tmp_path: Path
-    ) -> None:
+    def test_returns_none_when_walking_up_finds_nothing(self, tmp_path: Path) -> None:
         source = tmp_path / "n_foo.sru"
         # Resolve against tmp_path itself so we don't accidentally hit
         # the project's own root config (none exists at the moment).
@@ -103,9 +101,7 @@ class TestSkipByEntryType:
         "entry_type",
         ["application", "userobject", "window", "function", "structure"],
     )
-    def test_powerscript_entries_pass_through(
-        self, tmp_path: Path, entry_type: str
-    ) -> None:
+    def test_powerscript_entries_pass_through(self, tmp_path: Path, entry_type: str) -> None:
         _write_config(tmp_path, '[style]\nindent = "tab"\n')
         source = tmp_path / "x.sru"
         out = _resolve_format("auto", str(source), entry_type)

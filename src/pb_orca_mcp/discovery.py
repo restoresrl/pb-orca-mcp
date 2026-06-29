@@ -187,9 +187,7 @@ def _looks_like_pb_major(name: str) -> bool:
     return len(parts) == 2 and all(p.isdigit() for p in parts)
 
 
-def _read_registry_values(
-    winreg_mod: Any, parent: Any, subkey_name: str
-) -> dict[str, str] | None:
+def _read_registry_values(winreg_mod: Any, parent: Any, subkey_name: str) -> dict[str, str] | None:
     try:
         sub = winreg_mod.OpenKey(parent, subkey_name)
     except OSError:
@@ -272,7 +270,7 @@ def _from_filesystem() -> tuple[list[PbInstall], list[PbRuntimeOnly]]:
 
 def _major_from_dir_name(name: str) -> str | None:
     """Extract `MAJOR.MINOR` from a `"PowerBuilder X.Y"` directory name."""
-    tail = name[len(_PB_DIR_PREFIX):].strip()
+    tail = name[len(_PB_DIR_PREFIX) :].strip()
     if _looks_like_pb_major(tail):
         return tail
     return None

@@ -181,9 +181,7 @@ def pb_edit_and_import(
     }
 
 
-def _resolve_format(
-    mode: bool | str, source_path: str, entry_type: str
-) -> FormatConfig | None:
+def _resolve_format(mode: bool | str, source_path: str, entry_type: str) -> FormatConfig | None:
     """Turn the public `format` argument into a `FormatConfig` (apply) or `None` (skip).
 
     The decision tree:
@@ -206,9 +204,7 @@ def _resolve_format(
     elif mode == "auto":
         force = False
     else:
-        raise ValueError(
-            f"format must be 'auto', True, or False (got {mode!r})"
-        )
+        raise ValueError(f"format must be 'auto', True, or False (got {mode!r})")
 
     try:
         ext = extension_for_entry_type(entry_type)

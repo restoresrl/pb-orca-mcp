@@ -144,9 +144,7 @@ class TestComments:
 
 
 class TestOperators:
-    @pytest.mark.parametrize(
-        "op", ["<=", ">=", "<>", "+=", "-=", "*=", "/=", "::"]
-    )
+    @pytest.mark.parametrize("op", ["<=", ">=", "<>", "+=", "-=", "*=", "/=", "::"])
     def test_two_char_ops_recognised(self, op: str) -> None:
         toks = list(tokenize(op))
         assert toks == [Token(TokenKind.OP, op, 0)]

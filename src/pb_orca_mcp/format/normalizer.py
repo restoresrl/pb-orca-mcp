@@ -39,9 +39,21 @@ from pb_orca_mcp.format.lexer import Token, TokenKind, tokenize
 
 _SPACED_OPS: frozenset[str] = frozenset(
     {
-        "=", "+", "-", "*", "/", "^",
-        "<", ">", "<=", ">=", "<>",
-        "+=", "-=", "*=", "/=",
+        "=",
+        "+",
+        "-",
+        "*",
+        "/",
+        "^",
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "<>",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
     }
 )
 
@@ -52,9 +64,28 @@ _POTENTIALLY_UNARY: frozenset[str] = frozenset({"+", "-"})
 # separators (``f(-5)``, ``a[-1]``, ``foo, -2``), and continuation ``&``.
 _EXPRESSION_START_OPS: frozenset[str] = frozenset(
     {
-        "(", "[", "{", ",", ";", "=", "+", "-", "*", "/", "^",
-        "<", ">", "<=", ">=", "<>", "+=", "-=", "*=", "/=",
-        "&", "::",
+        "(",
+        "[",
+        "{",
+        ",",
+        ";",
+        "=",
+        "+",
+        "-",
+        "*",
+        "/",
+        "^",
+        "<",
+        ">",
+        "<=",
+        ">=",
+        "<>",
+        "+=",
+        "-=",
+        "*=",
+        "/=",
+        "&",
+        "::",
     }
 )
 
@@ -175,16 +206,10 @@ def _is_unary_context(prev_sig: Token | None) -> bool:
     return False
 
 
-def _apply_keyword_case(
-    word: str, prev_sig: Token | None, config: FormatConfig
-) -> str:
+def _apply_keyword_case(word: str, prev_sig: Token | None, config: FormatConfig) -> str:
     if config.keyword_case == "preserve":
         return word
-    if (
-        prev_sig is not None
-        and prev_sig.kind == TokenKind.OP
-        and prev_sig.text in (".", "::")
-    ):
+    if prev_sig is not None and prev_sig.kind == TokenKind.OP and prev_sig.text in (".", "::"):
         return word
     if word.lower() not in RESERVED:
         return word

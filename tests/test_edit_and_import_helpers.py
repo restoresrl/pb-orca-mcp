@@ -71,11 +71,7 @@ class TestStripExportHeaders:
         assert _strip_export_headers(text) == "forward\nend forward\n"
 
     def test_strips_pbexport_header_and_comments(self) -> None:
-        text = (
-            "$PBExportHeader$x.srw\n"
-            "$PBExportComments$old comment\n"
-            "forward\n"
-        )
+        text = "$PBExportHeader$x.srw\n$PBExportComments$old comment\nforward\n"
         assert _strip_export_headers(text) == "forward\n"
 
     def test_strips_with_crlf_endings(self) -> None:

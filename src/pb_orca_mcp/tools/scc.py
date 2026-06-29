@@ -124,9 +124,7 @@ def pb_scc_connect_offline(
     return {"ok": True, **result}
 
 
-def pb_scc_set_target(
-    target_file: str, flags: list[str] | None = None
-) -> dict[str, Any]:
+def pb_scc_set_target(target_file: str, flags: list[str] | None = None) -> dict[str, Any]:
     """Bind the SCC connection to a target (`.pbt`) and return affected PBLs.
 
     `flags` is an optional list of SCC refresh-flag names:

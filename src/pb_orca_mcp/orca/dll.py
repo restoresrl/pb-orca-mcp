@@ -301,7 +301,13 @@ def _bind_library_fns(dll: ctypes.WinDLL) -> LibraryFns:
 
     entry_export_ex = dll.PBORCA_LibraryEntryExportEx
     entry_export_ex.argtypes = [
-        c_void_p, c_wchar_p, c_wchar_p, c_int, c_wchar_p, c_long, POINTER(c_long)
+        c_void_p,
+        c_wchar_p,
+        c_wchar_p,
+        c_int,
+        c_wchar_p,
+        c_long,
+        POINTER(c_long),
     ]
     entry_export_ex.restype = c_int
 
@@ -333,17 +339,30 @@ def _bind_compile_fns(dll: ctypes.WinDLL) -> CompileFns:
     """Apply `argtypes`/`restype` to the compile/rebuild entry points."""
     entry_import = dll.PBORCA_CompileEntryImport
     entry_import.argtypes = [
-        c_void_p, c_wchar_p, c_wchar_p, c_int, c_wchar_p, c_wchar_p, c_long,
-        PBORCA_ERRPROC, c_void_p,
+        c_void_p,
+        c_wchar_p,
+        c_wchar_p,
+        c_int,
+        c_wchar_p,
+        c_wchar_p,
+        c_long,
+        PBORCA_ERRPROC,
+        c_void_p,
     ]
     entry_import.restype = c_int
 
     entry_import_list = dll.PBORCA_CompileEntryImportList
     entry_import_list.argtypes = [
         c_void_p,
-        POINTER(c_wchar_p), POINTER(c_wchar_p), POINTER(c_int),
-        POINTER(c_wchar_p), POINTER(c_wchar_p), POINTER(c_long),
-        c_int, PBORCA_ERRPROC, c_void_p,
+        POINTER(c_wchar_p),
+        POINTER(c_wchar_p),
+        POINTER(c_int),
+        POINTER(c_wchar_p),
+        POINTER(c_wchar_p),
+        POINTER(c_long),
+        c_int,
+        PBORCA_ERRPROC,
+        c_void_p,
     ]
     entry_import_list.restype = c_int
 
@@ -371,9 +390,16 @@ def _bind_build_fns(dll: ctypes.WinDLL) -> BuildFns:
 
     exe_create = dll.PBORCA_ExecutableCreate
     exe_create.argtypes = [
-        c_void_p, c_wchar_p, c_wchar_p, c_wchar_p,
-        PBORCA_LNKPROC, c_void_p,
-        POINTER(c_int), c_int, c_long, c_void_p,
+        c_void_p,
+        c_wchar_p,
+        c_wchar_p,
+        c_wchar_p,
+        PBORCA_LNKPROC,
+        c_void_p,
+        POINTER(c_int),
+        c_int,
+        c_long,
+        c_void_p,
     ]
     exe_create.restype = c_int
 

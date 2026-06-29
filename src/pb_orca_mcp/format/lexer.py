@@ -44,9 +44,7 @@ class Token:
     pos: int
 
 
-_TWO_CHAR_OPS: frozenset[str] = frozenset(
-    {"<=", ">=", "<>", "+=", "-=", "*=", "/=", "::"}
-)
+_TWO_CHAR_OPS: frozenset[str] = frozenset({"<=", ">=", "<>", "+=", "-=", "*=", "/=", "::"})
 
 _SINGLE_CHAR_OPS: frozenset[str] = frozenset(set("=+-*/<>^.,;:()[]{}&!?@|"))
 

@@ -73,9 +73,7 @@ def pb_library_directory(lib_path: str, entry_type: str = "any") -> dict[str, An
     }
 
 
-def pb_library_entry_information(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_library_entry_information(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """Metadata for a single entry."""
     session = Session.instance()
     try:
@@ -88,9 +86,7 @@ def pb_library_entry_information(
         return {"error": exc.to_dict()}
 
 
-def pb_library_entry_export(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_library_entry_export(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """Export the source of a single entry as a string."""
     session = Session.instance()
     try:
@@ -109,9 +105,7 @@ def pb_library_entry_export(
     }
 
 
-def pb_library_entry_delete(
-    lib_path: str, entry_name: str, entry_type: str
-) -> dict[str, Any]:
+def pb_library_entry_delete(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
     """Delete a single entry from a PBL."""
     session = Session.instance()
     try:
