@@ -22,6 +22,56 @@ EXE/PBD creation, hierarchy and reference queries — over a flat C API.
 This project wraps that API as MCP tools so an agent can drive
 PowerBuilder directly.
 
+## How it works — the agentic loop
+
+PowerBuilder is a closed-world IDE: an agent can read and write the
+`.sr*` text PB exports, but it can't compile, validate, inspect libraries
+or build artifacts without a human opening the IDE. That breaks the
+edit → compile → read errors → fix loop at the heart of agentic coding.
+
+pb-orca hands the agent the same primitives the IDE uses internally, over
+MCP. The agent opens **one session** against a chosen PB install — in
+effect, it *becomes the IDE, headless* — and works through four phases:
+
+1. **Understand** — `pb_library_directory` lists what's in a `.pbl`,
+   `pb_library_entry_export` returns an object's source, and
+   `pb_object_query_hierarchy` / `pb_object_query_reference` walk
+   inheritance and outgoing references. The agent maps a PB codebase it
+   has never seen.
+2. **Change and validate** — the core loop. The agent imports new source
+   with `pb_compile_entry_import`; ORCA compiles it and returns
+   **structured errors** (object, line, column, message). The agent reads
+   the error, fixes it, and re-imports. This is the loop that was
+   impossible before — the source crosses the C ABI and lands in the
+   `.pbl` with no IDE window in the way.
+3. **Validate broadly** — `pb_application_rebuild` recompiles the whole
+   target (full / incremental) to surface cascading breakage.
+4. **Build and sync** — `pb_executable_create` /
+   `pb_dynamic_library_create` produce EXE/PBD; on git-managed projects
+   `pb_scc_refresh_target` propagates `ws_objects/` into the `.pbl`.
+
+**A concrete session** — *"add a method to `n_cst_order` and confirm it
+compiles"*:
+
+```text
+pb_session_open(22.0)
+  → pb_set_library_list + pb_set_current_application
+  → pb_library_entry_export(n_cst_order)      # read the current source
+  → (agent edits the source)
+  → pb_compile_entry_import(...)              # import + compile
+  → on errors: read line/column/message, fix, re-import
+  → pb_application_rebuild(incremental)       # nothing else broke
+```
+
+No IDE window is ever opened.
+
+**Boundaries.** pb-orca is an inspect / compile / build bridge through
+ORCA — not a release build runner (PowerGen and batch scripts stay), and
+it does not enforce source style (that's
+[`pb-format`](https://github.com/restoresrl/pb-format)). It reads and
+writes PowerBuilder libraries; higher-level orchestration, skills and
+knowledge live in [`pb-ai-code`](https://github.com/restoresrl/pb-ai-code).
+
 ## Quickstart
 
 ```pwsh
@@ -124,10 +174,16 @@ stability — no fixed date.
 ## Documentation
 
 - [`docs/installation.md`](docs/installation.md) — PB prerequisites, x86 vs x64 Python, troubleshooting
-- [`docs/claude-code-setup.md`](docs/claude-code-setup.md) — `.claude/mcp.json` snippets and validation
+- [`docs/claude-code-setup.md`](docs/claude-code-setup.md) — register the MCP server, install the agent skills, validate the setup
 - [`docs/tools.md`](docs/tools.md) — every MCP tool, input/output schema, examples
 - [`docs/recipes.md`](docs/recipes.md) — end-to-end workflows
+- [`docs/workflow.md`](docs/workflow.md) — the object-editing model (`.pbl` ↔ `ws_objects/` source of truth)
 - [`PLAN.md`](PLAN.md) — full design document
+
+The two agent skills — `pb-orca` (the engine/loop overview) and
+`pb-workflow` (the object-editing discipline) — live under
+[`.claude/skills/`](.claude/skills/). The setup guide explains how to
+install them into Claude Code so the agent loads them automatically.
 
 ## Related projects
 

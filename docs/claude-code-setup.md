@@ -106,7 +106,38 @@ exposed. If `0 tools` or the server isn't listed, check:
 - `pb-orca-mcp doctor` (in your shell) exits 0.
 - Claude Code's MCP log: a failed server prints its stderr there.
 
-## 4. First prompt to try
+## 4. Install the agent skills (recommended)
+
+The server gives Claude the *tools*; two **skills** give it the *know-how*
+to use them well. They ship in this repo under `.claude/skills/` but are
+not part of the pip package — copy them into your Claude Code skills
+directory:
+
+- **`pb-orca`** — the engine overview: the session lifecycle, the four
+  phases of the loop (understand → change → validate → build), and the
+  ORCA gotchas. Loads automatically when Claude drives PB through the
+  server.
+- **`pb-workflow`** — the object-editing discipline for git-managed PB
+  projects: which form is canonical (`.pbl` vs `ws_objects/`), how to keep
+  them in sync, and the add/delete integrity check.
+
+Copy both into one of:
+
+- **User-wide** — `~/.claude/skills/` (available in every project), or
+- **Project** — `<your PB workspace>/.claude/skills/` (committed with the team).
+
+```pwsh
+# from a clone of this repo:
+Copy-Item -Recurse .claude/skills/pb-orca     ~/.claude/skills/
+Copy-Item -Recurse .claude/skills/pb-workflow ~/.claude/skills/
+```
+
+Without the skills Claude can still call every tool; with them it knows
+the session order, the export-header requirement, and the source-of-truth
+model up front — fewer wrong turns. Restart Claude Code after copying, and
+check `/skills` lists them.
+
+## 5. First prompt to try
 
 > "Find every PowerBuilder install on this machine and tell me which
 > versions you can drive."
@@ -121,7 +152,7 @@ includes the exact `pborc.dll` path that was loaded. From there any of
 the [recipes](recipes.md) is fair game — the compile-test loop (Recipe 1)
 is the canonical first real workflow to try.
 
-## 5. Combine with sources extracted from PB
+## 6. Combine with sources extracted from PB
 
 `pb-orca-mcp` doesn't replace Claude's normal file-edit capabilities. The
 common pattern is:
