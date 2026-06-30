@@ -9,16 +9,16 @@ git-managed PB project.
 - **Part 2 — The editing model**: how the binary `.pbl` and the textual
   `ws_objects/` projection relate, and how to keep them consistent.
 
-For the full schema of every tool see [`tools.md`](tools.md); for install
-and the x86/x64 gotcha see [`installation.md`](installation.md); for the
-MCP config and skills see [`claude-code-setup.md`](claude-code-setup.md).
+For the full schema of every tool see [`tools.md`](tools.md); for install,
+registering the server with your MCP client, the x86/x64 gotcha, and the
+optional skills see [`setup.md`](setup.md).
 
 ---
 
 # Part 1 — Recipes
 
 Each recipe shows the JSON tool-call sequence with notes on why each step
-is required. These are the patterns Claude Code follows when given a
+is required. These are the patterns an MCP agent follows when given a
 high-level task like "fix the compile error in `n_cst_main`".
 
 ## Session bootstrap
@@ -299,8 +299,9 @@ If you already have a working batch build (PowerGen, OrcaScript, a custom
 `build.bat`), keep it. `pb-orca-mcp` is an interactive development tool for
 an agent's inner loop, not a tagged-release build runner:
 
-- The MCP server runs in the same process as Claude Code; an unhandled
-  crash takes the whole agent down. CI wants process isolation and retry.
+- The MCP server runs in the same process tree as the MCP client that
+  launched it; an unhandled crash takes the agent session down. CI wants
+  process isolation and retry.
 - The library list is per-session in memory; a release build needs
   reproducible config files.
 - ORCA is single-session-per-process; parallel CI builds hit that wall.

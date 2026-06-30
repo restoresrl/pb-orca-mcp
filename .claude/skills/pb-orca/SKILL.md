@@ -1,6 +1,8 @@
 ---
 name: pb-orca
 description: Use this when driving PowerBuilder through the pb-orca MCP server — opening an ORCA session and inspecting PBLs, compiling/importing entries, rebuilding targets, building EXE/PBD, or querying object hierarchy and references. Covers the session lifecycle, the edit→compile→fix loop, and the ORCA gotchas (single session per process, IDE locks, the export-header requirement, x86/x64). For the .pbl↔ws_objects source-of-truth editing model specifically, see the pb-workflow skill.
+metadata:
+  version: "0.1.0"
 ---
 
 # Driving PowerBuilder with pb-orca

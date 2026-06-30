@@ -4,9 +4,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
 
-MCP server that bridges Claude Code (and other MCP clients) to PowerBuilder
-via the ORCA API (`pborc.dll`, shipped with every PB IDE install). It works
-with **any PB version that exposes ORCA**. It lets an AI coding agent
+MCP server that exposes PowerBuilder's ORCA API (`pborc.dll`, shipped with
+every PB IDE install) as MCP tools — so any MCP client (Claude Code, Cursor,
+Codex, Gemini CLI, Copilot, …) driving any model can bridge to PowerBuilder.
+It works with **any PB version that exposes ORCA**, and lets the agent
 inspect PBLs, compile entries, rebuild targets, and produce EXE/PBD
 artifacts — closing the "edit → compile → read errors → fix" loop that
 PowerBuilder's GUI-only IDE otherwise keeps closed.
@@ -85,7 +86,10 @@ uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
 # doctor should end with "Doctor OK: N usable install(s)".
 ```
 
-In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide):
+Register the server with your MCP client. The block below is the standard
+MCP `mcpServers` shape — identical across clients; only the file it goes in
+differs (Claude Code: `.claude/mcp.json`; Cursor: `.cursor/mcp.json`; etc. —
+see [`docs/setup.md`](docs/setup.md)):
 
 ```json
 {
@@ -99,12 +103,11 @@ In `.claude/mcp.json` (per-project) or `~/.claude/mcp.json` (user-wide):
 ```
 
 `uvx --from git+<url>` builds and runs the server straight from the repo —
-no clone needed. (Working *on* pb-orca itself? Clone it and
-point `--from` at the local path instead — see
-[`docs/installation.md`](docs/installation.md).) After restarting Claude
-Code, `/mcp` should list the `pb_*` tools. Full setup walkthrough (x86
-pinning, multi-version,
-troubleshooting): [`docs/claude-code-setup.md`](docs/claude-code-setup.md).
+no clone needed. (Working *on* pb-orca itself? Clone it and point `--from`
+at the local path instead — see [`docs/setup.md`](docs/setup.md).) Reload
+your MCP client (in Claude Code, run `/mcp`); the `pb_*` tools should
+appear. Full setup walkthrough — registration per client, x86 pinning,
+multi-version, troubleshooting: [`docs/setup.md`](docs/setup.md).
 
 ## Requirements
 
@@ -165,9 +168,9 @@ release, 2026-05-13); install it from the repo with `uv` (see
 All of ORCA's public API is wired through to MCP tools (29 total). The ABI
 is verified against PB 2022 R3, and the same prototypes cover every release
 since PB 2019 (the ABI is stable) — PB 2019 R3 and 2025 are exercised too.
-The test suite is green, including an end-to-end compile-test loop run by
-Claude Code against a real PB 22.0 workspace; the PB-dependent tests skip
-cleanly when no local PB install is present.
+The test suite is green, including an end-to-end compile-test loop driven by
+an MCP agent (Claude Code, in our case) against a real PB 22.0 workspace;
+the PB-dependent tests skip cleanly when no local PB install is present.
 
 A GitHub-hosted, MIT-licensed project for PowerBuilder developers on Windows
 to use and contribute to. The repository is **currently private during
@@ -176,15 +179,17 @@ stability — no fixed date.
 
 ## Documentation
 
-- [`docs/installation.md`](docs/installation.md) — PB prerequisites, x86 vs x64 Python, troubleshooting
-- [`docs/claude-code-setup.md`](docs/claude-code-setup.md) — register the MCP server, install the agent skills, validate the setup
+- [`docs/setup.md`](docs/setup.md) — install, register the server with your MCP client (per-client examples), x86 vs x64 Python, troubleshooting
 - [`docs/tools.md`](docs/tools.md) — every MCP tool, input/output schema, examples
 - [`docs/usage.md`](docs/usage.md) — recipes (compile loop, build, queries) + the `.pbl` ↔ `ws_objects/` editing model
 
-The two agent skills — `pb-orca` (the engine/loop overview) and
-`pb-workflow` (the object-editing discipline) — live under
-[`.claude/skills/`](.claude/skills/). The setup guide explains how to
-install them into Claude Code so the agent loads them automatically.
+Two optional agent skills — `pb-orca` (the engine/loop overview) and
+`pb-workflow` (the object-editing discipline) — are written to the
+[Agent Skills](https://agentskills.io) `SKILL.md` standard, so any
+skill-aware agent can use them (Claude Code, Codex CLI, Gemini CLI, Copilot,
+Cursor, …). They are not required to use the server; the docs cover the same
+ground for clients without skills. Install instructions per agent are in
+[`docs/setup.md`](docs/setup.md).
 
 ## Related projects
 

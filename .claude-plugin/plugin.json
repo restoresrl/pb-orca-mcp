@@ -6,14 +6,12 @@
   "keywords": ["powerbuilder", "pb", "orca", "pbl", "ws_objects", "appeon"],
 
   "_TODO_marketplace_distribution": [
-    "Step B (future session): register this plugin in a marketplace.",
+    "Step B (future session): register this plugin in a marketplace as ONE optional install channel for Claude Code users.",
     "Options for the marketplace manifest:",
     "  - GitHub mirror of this repo with .claude-plugin/marketplace.json at the root,",
     "  - dedicated marketplace repo (e.g. github.com/<org>/claude-plugins),",
     "  - local directory marketplace for development (file://...).",
-    "After publication, register on the user side via extraKnownMarketplaces in ~/.claude/settings.json,",
-    "then install with the /plugin command. At that point the user-level copy at",
-    "~/.claude/skills/pb-workflow/SKILL.md can be removed; the canonical skill source becomes",
-    "this repo's .claude/skills/pb-workflow/SKILL.md."
+    "After publication, register on the user side via extraKnownMarketplaces in ~/.claude/settings.json, then install with the /plugin command.",
+    "Note: the skills are agentskills-standard SKILL.md files usable by any skill-aware agent; this plugin is just the Claude Code packaging of them, not their canonical home. The agnostic docs (docs/usage.md, docs/setup.md) are the cross-agent source of truth."
   ]
 }

@@ -20,7 +20,7 @@ input it ran on.
 - Output of `pb-orca-mcp doctor` (or, if it crashes, the error):
 - PowerBuilder version(s):
 - Python version and architecture (`python -c "import sys,struct; print(sys.version, struct.calcsize('P')*8)"`):
-- MCP client (Claude Code / other):
+- MCP client (e.g. Claude Code, Cursor, Codex CLI, …):
 - pb-orca-mcp version:
 
 ## ORCA error (if any)

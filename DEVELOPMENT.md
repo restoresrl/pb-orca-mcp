@@ -30,18 +30,23 @@ Checklist al momento del flip (cose ancora da fare):
   `PB_ORCA_MCP_HAS_PB=1`); con l'env var + venv x86, run completi sull'host con
   PB. Fixture `tests/fixtures/tiny_app/genapp.pbl` (+ `genapp.sra`) per l'happy
   path del compile loop.
-- **Il server MCP NON fa hot-reload**: è spawnato da Claude Code all'avvio
-  (config in `.claude/mcp.json`, non committed — contiene il path locale al venv
-  x86). Una modifica a `src/` richiede **riavvio di Claude Code** per essere
-  testabile via tool MCP; i pytest la vedono subito (editable install).
-- **Restart → preferisci `claude --resume`** (o `-c`) per non perdere il
-  contesto conversazionale; handoff memory solo come fallback (conversazione
-  troppo lunga, context vicino al limite, sessione da scartare). Dettaglio:
+- **Il loop di sviluppo primario è `pytest` + `ruff` + `mypy`**: vedono le
+  modifiche a `src/` subito (editable install) e non richiedono alcun client
+  MCP né AI. Un client MCP serve solo per lo smoke test end-to-end.
+- **Il server MCP NON fa hot-reload**: lo spawna il client MCP che lo registra
+  (config tipo `.claude/mcp.json` per Claude Code, l'equivalente per altri
+  client; non committed — contiene il path locale al venv x86). Una modifica a
+  `src/` richiede quindi **riavvio del client MCP** per essere testabile via
+  tool.
+- **Se sviluppi con Claude Code**: dopo un restart preferisci `claude --resume`
+  (o `-c`) per non perdere il contesto conversazionale; handoff memory solo come
+  fallback (conversazione troppo lunga, sessione da scartare). Tip
+  Claude-specifico; con altri client/strumenti non si applica. Dettaglio:
   memorie `suggest-resume-on-restart`, `save-operational-plans-before-restart`.
 - **Pre-commit hygiene** (manuale): `ruff check` + `ruff format --check` +
   `mypy src` + `pytest` verdi prima del commit.
-- **Release loop**: feature/fix → pytest verde → smoke test via MCP con Claude
-  Code in driver → commit + push → tag annotato `vX.Y.Z` → `git push origin
+- **Release loop**: feature/fix → pytest verde → smoke test via un client MCP
+  (es. Claude Code) in driver → commit + push → tag annotato `vX.Y.Z` → `git push origin
   vX.Y.Z` → (eventuale) GitHub Release sul tag, per install pinnati via
   `uvx --from git+...@vX.Y.Z`. Per release significative, note nel messaggio del
   tag (`git show v0.1.0` come modello).

@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into a single [`docs/usage.md`](docs/usage.md). Internal development docs
   (dev process + design rationale) consolidated into a root `DEVELOPMENT.md`,
   kept out of the package; `CLAUDE.md` trimmed.
+- Made the project client- and model-agnostic. The package identity
+  (`description`, package docstring, keywords) and the docs now describe a
+  generic MCP server usable from any MCP client (Claude Code, Cursor, Codex
+  CLI, …) and any model; Claude Code is one worked example. `docs/installation.md`
+  and `docs/claude-code-setup.md` merged into a single client-neutral
+  [`docs/setup.md`](docs/setup.md) with per-client registration examples. The
+  two agent skills are documented as [Agent Skills](https://agentskills.io)
+  `SKILL.md` standard (cross-agent), and contributing is documented as a normal
+  Python workflow where AI is optional.
 
 ### Fixed
 

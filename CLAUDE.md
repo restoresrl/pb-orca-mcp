@@ -7,10 +7,11 @@ Processo di sviluppo interno (release, restart, sibling, stato): vedi
 ## Contesto
 
 `pb-orca-mcp` è un **server MCP Python** che espone l'API ORCA di PowerBuilder come
-tool MCP, abilitando Claude Code a guidare PB in autonomia: ispezionare PBL,
-compilare entry, rebuild target, costruire EXE / PBD / dynamic library. Progetto
-**general-purpose** (non Restore-specifico): audience = chiunque sviluppi PB e voglia
-un workflow agentico.
+tool MCP, abilitando un agente MCP (Claude Code, Cursor, Codex, … con qualsiasi
+modello) a guidare PB in autonomia: ispezionare PBL, compilare entry, rebuild
+target, costruire EXE / PBD / dynamic library. Progetto **general-purpose** (non
+Restore-specifico): audience = chiunque sviluppi PB e voglia un workflow agentico,
+con qualunque client/modello.
 
 ## Stack & convenzioni
 
@@ -48,7 +49,7 @@ un workflow agentico.
   trovate e marcate `tested: false`. ABI ORCA stabile da PB 2019.
 - **IDE vs runtime**: il discovery filtra le install runtime-only (senza `pborc.dll`).
 - **x86 vs x64**: Python deve girare nella stessa arch della DLL caricata (vedi
-  `docs/installation.md`).
+  `docs/setup.md`).
 - **Path Windows**: accettiamo `/` in input e normalizziamo internamente con `Path`.
 
 ### ORCA / ctypes

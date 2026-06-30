@@ -1,6 +1,8 @@
 ---
 name: pb-workflow
 description: Use this when modifying PowerBuilder objects (.sru, .srf, .srw, .sra) via the pb-orca MCP server. Covers the source-of-truth model (ws_objects/ on git projects, .pbl on standalone), how to propagate edits correctly without breaking the .pbl ↔ ws_objects/ consistency, and the integrity check for add/delete operations.
+metadata:
+  version: "0.1.0"
 ---
 
 # PowerBuilder object-editing workflow

@@ -5,14 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "pb-orca-mcp"
 version = "0.1.0"
-description = "MCP server that bridges Claude Code to PowerBuilder via the ORCA API (pborc.dll)"
+description = "MCP server exposing PowerBuilder's ORCA API (pborc.dll) as MCP tools — usable from any MCP client"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
     { name = "Carlo Torrese", email = "carlo.torrese@re-store.it" },
 ]
-keywords = ["powerbuilder", "orca", "mcp", "claude", "agentic", "pb"]
+keywords = ["powerbuilder", "orca", "mcp", "agentic", "pb", "ctypes", "powerbuilder-ide"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",

@@ -1,10 +1,11 @@
 # Contributing to pb-orca-mcp
 
-Thanks for your interest. This project bridges Claude Code (and other MCP
-clients) to PowerBuilder through the ORCA API. Because ORCA is a Win32
-DLL shipped only with the PB IDE, some of the development loop is
-inherently Windows- and PB-specific — but a lot of the code (parsing,
-discovery, the MCP plumbing) is plain Python you can work on anywhere.
+Thanks for your interest. This project bridges MCP clients — Claude Code,
+Cursor, Codex CLI, Gemini CLI, and others — to PowerBuilder through the ORCA
+API. Because ORCA is a Win32 DLL shipped only with the PB IDE, some of the
+development loop is inherently Windows- and PB-specific — but a lot of the
+code (parsing, discovery, the MCP plumbing) is plain Python you can work on
+anywhere.
 
 ## Ground rules
 
@@ -17,6 +18,10 @@ discovery, the MCP plumbing) is plain Python you can work on anywhere.
 - **No vendor- or workspace-specific assumptions.** No hardcoded user
   paths, no convention baked in from a single shop. The server must run
   on any Windows machine with a PB IDE installed.
+- **No AI required to contribute.** The dev loop is `pytest` + `ruff` +
+  `mypy` — they see `src/` changes immediately. An MCP client (any one:
+  Claude Code, Cursor, Codex CLI, …) is needed only for an end-to-end smoke
+  test against a real PB IDE; if you use one, any model works.
 
 ## Development setup
 
