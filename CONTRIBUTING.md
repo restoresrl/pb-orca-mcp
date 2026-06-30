@@ -1,15 +1,15 @@
 # Contributing to pb-orca-mcp
 
-Thanks for your interest. This project bridges MCP clients — Claude Code,
-Cursor, Codex CLI, Gemini CLI, and others — to PowerBuilder through the ORCA
+Thanks for your interest. This project bridges MCP clients (Claude Code,
+Cursor, Codex CLI, Gemini CLI, and others) to PowerBuilder through the ORCA
 API. Because ORCA is a Win32 DLL shipped only with the PB IDE, some of the
-development loop is inherently Windows- and PB-specific — but a lot of the
+development loop is inherently Windows- and PB-specific, but a lot of the
 code (parsing, discovery, the MCP plumbing) is plain Python you can work on
 anywhere.
 
 `AGENTS.md` at the repo root is **optional** context for AI coding agents (the
 [AGENTS.md](https://agents.md) cross-tool standard; Claude Code reads it as its
-fallback memory file too). If you contribute without an AI tool, ignore it —
+fallback memory file too). If you contribute without an AI tool, ignore it;
 this guide is all you need.
 
 ## Ground rules
@@ -17,14 +17,14 @@ this guide is all you need.
 - **Issues before large PRs.** Open an issue describing the change first
   for anything beyond a small fix, so we can agree on scope.
 - **Scope discipline.** This package wraps the ORCA API and nothing more.
-  Higher-level agentic workflows, skills, and knowledge are out of scope —
+  Higher-level agentic workflows, skills, and knowledge are out of scope;
   they belong in a layer on top of this server. New features here should
   map to an ORCA primitive or directly support the compile/build loop.
 - **No vendor- or workspace-specific assumptions.** No hardcoded user
   paths, no convention baked in from a single shop. The server must run
   on any Windows machine with a PB IDE installed.
 - **No AI required to contribute.** The dev loop is `pytest` + `ruff` +
-  `mypy` — they see `src/` changes immediately. An MCP client (any one:
+  `mypy`, which see `src/` changes immediately. An MCP client (any one:
   Claude Code, Cursor, Codex CLI, …) is needed only for an end-to-end smoke
   test against a real PB IDE; if you use one, any model works.
 
@@ -64,7 +64,7 @@ $env:PB_ORCA_MCP_HAS_PB = "1"
 pytest -m requires_pb
 ```
 
-CI does not run these — GitHub runners have no PowerBuilder. Keep the
+CI does not run these, because GitHub runners have no PowerBuilder. Keep the
 non-PB suite green and self-contained; mock ORCA only for unit tests of
 parsing/discovery, never for the compile loop (see `tests/test_session_real.py`).
 
