@@ -50,8 +50,8 @@ Issues = "https://github.com/restoresrl/pb-orca-mcp/issues"
 packages = ["src/pb_orca_mcp"]
 
 [tool.hatch.build.targets.sdist]
-# `include` is an explicit allowlist, so internal docs not listed here —
-# CLAUDE.md and DEVELOPMENT.md — are not shipped to package users.
+# `include` is an explicit allowlist, so files not listed here — e.g. AGENTS.md
+# (agent context) — are not shipped to package users.
 include = [
     "src/pb_orca_mcp",
     "tests",

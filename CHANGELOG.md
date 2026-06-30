@@ -18,9 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   CRLF, see `docs/usage.md` Recipe 1.5), then call `pb_compile_entry_import`
   to import it. The `tomli` dependency is dropped. Tool count is 29.
 - Documentation consolidated: `docs/recipes.md` + `docs/workflow.md` merged
-  into a single [`docs/usage.md`](docs/usage.md). Internal development docs
-  (dev process + design rationale) consolidated into a root `DEVELOPMENT.md`,
-  kept out of the package; `CLAUDE.md` trimmed.
+  into a single [`docs/usage.md`](docs/usage.md). Internal dev docs removed from
+  the working tree — design rationale folded into [`AGENTS.md`](AGENTS.md), the
+  dev workflow into [`CONTRIBUTING.md`](CONTRIBUTING.md); the old `dev/` folder
+  and `DEVELOPMENT.md` remain in git history.
 - Made the project client- and model-agnostic. The package identity
   (`description`, package docstring, keywords) and the docs now describe a
   generic MCP server usable from any MCP client (Claude Code, Cursor, Codex
@@ -29,7 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [`docs/setup.md`](docs/setup.md) with per-client registration examples. The
   two agent skills are documented as [Agent Skills](https://agentskills.io)
   `SKILL.md` standard (cross-agent), and contributing is documented as a normal
-  Python workflow where AI is optional.
+  Python workflow where AI is optional. The agent instructions moved from
+  `CLAUDE.md` (removed) to a cross-tool [`AGENTS.md`](AGENTS.md) (the
+  [agents.md](https://agents.md) standard, read natively by Codex, Cursor,
+  Copilot, Zed, … and by Claude Code as its fallback memory file), so every
+  agent gets the same project context — not just Claude Code.
 
 ### Fixed
 

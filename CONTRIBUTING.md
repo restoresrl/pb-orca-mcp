@@ -7,6 +7,11 @@ development loop is inherently Windows- and PB-specific — but a lot of the
 code (parsing, discovery, the MCP plumbing) is plain Python you can work on
 anywhere.
 
+`AGENTS.md` at the repo root is **optional** context for AI coding agents (the
+[AGENTS.md](https://agents.md) cross-tool standard; Claude Code reads it as its
+fallback memory file too). If you contribute without an AI tool, ignore it —
+this guide is all you need.
+
 ## Ground rules
 
 - **Issues before large PRs.** Open an issue describing the change first
