@@ -106,15 +106,11 @@ pinning, multi-version, and troubleshooting: [`docs/setup.md`](docs/setup.md).
 
 ## Requirements
 
-- **Windows**. ORCA is a Win32 DLL.
-- **PowerBuilder Development Environment** (not runtime-only; those lack `pborc.dll`).
-- **Python 3.10+** with the **same architecture** as the PB IDE you want
-  to drive. PB IDE is historically x86 across all releases through 2025,
-  so an **x86 Python interpreter** is the common case. The server refuses
-  to load a mismatched DLL with an explicit error.
-
-`pb-orca-mcp doctor` checks all three and tells you which installs are
-usable from the current Python interpreter.
+Windows, a PowerBuilder **IDE** install (runtime-only installs lack
+`pborc.dll`), and a Python 3.10+ interpreter whose architecture matches the
+PB IDE (historically x86). `pb-orca-mcp doctor` checks all three and reports
+which installs are usable. Full prerequisites and the x86/x64 gotcha:
+[`docs/setup.md`](docs/setup.md).
 
 > **Classic workspace format only.** pb-orca drives the classic workspace
 > architecture (binary `.pbl` with `.pbw` / `.pbt`). It does **not** work with
@@ -125,20 +121,11 @@ usable from the current Python interpreter.
 
 ## What it exposes
 
-Every function in ORCA's public API is mapped to one MCP tool. 29 tools
-total, grouped:
+Every function in ORCA's public API maps to one MCP tool, grouped into
+discovery, session, library, compile, build, object-query, and SCC
+operations. The [tool reference](docs/tools.md) lists each one with its
+input/output schema and examples.
 
-| Group | Tools |
-|---|---|
-| Discovery | `pb_discover_pb_install`, `pb_target_info` |
-| Session | `pb_session_open`, `pb_session_close`, `pb_set_current_application`, `pb_set_library_list` |
-| Library | `pb_library_create`, `pb_library_delete`, `pb_library_directory`, `pb_library_entry_information`, `pb_library_entry_export`, `pb_library_entry_delete`, `pb_library_entry_move`, `pb_library_comment_modify` |
-| Compile | `pb_compile_entry_import`, `pb_compile_entry_import_list`, `pb_application_rebuild`, `pb_get_last_compile_errors` |
-| Build | `pb_executable_create`, `pb_dynamic_library_create` |
-| Query | `pb_object_query_hierarchy`, `pb_object_query_reference`, `pb_object_regenerate` |
-| SCC | `pb_scc_connect_offline`, `pb_scc_set_target`, `pb_scc_refresh_target`, `pb_scc_exclude_library_list`, `pb_scc_get_connect_properties`, `pb_scc_close` |
-
-Full reference with input/output schema: [`docs/tools.md`](docs/tools.md).
 Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/usage.md).
 
 ## Architecture highlights
@@ -157,9 +144,6 @@ Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/u
 - **Single ORCA session per process**: enforced by the server. Switching
   installs means close + reopen, because ORCA is single-session-per-process
   and not thread-safe.
-- **Callback lifetime handling**: ORCA fires Python WINFUNCTYPE callbacks
-  for diagnostics and listings. We keep them alive in `Session._callback_refs`
-  during each call; otherwise GC mid-call crashes the process.
 
 ## Status
 
@@ -167,7 +151,7 @@ Alpha, in active development on `main`. `v0.1.0` is **tagged** (GitHub
 release, 2026-05-13); install it from the repo with `uv` (see
 [Quickstart](#quickstart)).
 
-All of ORCA's public API is wired through to MCP tools (29 total). The ABI
+All of ORCA's public API is wired through to MCP tools. The ABI
 is verified against PB 2022 R3, and the same prototypes cover every release
 since PB 2019 (the ABI is stable); PB 2019 R3 and 2025 are exercised too.
 The test suite is green, including an end-to-end compile-test loop driven by

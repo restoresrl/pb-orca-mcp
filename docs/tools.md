@@ -351,6 +351,65 @@ candidate caller in the library list.
 Re-emit object code for a single entry, without touching its source. Same
 response shape as the compile tools: `{"success", "errors", ...}`.
 
+## SCC (offline "Refresh PBL")
+
+The native equivalent of PB IDE's "Refresh PBL", for git/svn-managed
+projects where `ws_objects/` is the source of truth and the `.pbl` is
+derived. Offline mode reconciles add/modify/delete from `ws_objects/` into
+the binary library without contacting a remote SCC provider. The usual call
+order is `pb_scc_connect_offline` → `pb_scc_set_target` →
+`pb_scc_refresh_target` → `pb_scc_close`; see [`usage.md`](usage.md) for the
+full sequence and the git/svn caveats. Online connect, get-latest-version,
+and revision operations are not exposed (they need a live MSSCCI provider).
+
+### `pb_scc_connect_offline(workspace_file=None, *, local_proj_path=None, log_file=None, append_log=False, ...)`
+
+Open an offline SCC connection. In offline mode only `local_proj_path`,
+`log_file`, and `append_log` take effect; the other connection kwargs
+(`provider_name`, `user_id`, `project`, `aux_path`, `comment_max_len`,
+`delete_temp_files`, `delete_pbl_on_refresh`) are accepted for symmetry but
+ignored by the SCC layer. `local_proj_path` must be the **parent of
+`ws_objects/`**. If `workspace_file` is given and has an SCC block, its
+values seed the config; a missing block (`PBORCA_REGREADERROR`, the normal
+case on git/svn) is tolerated and the connection is built from the kwargs.
+Returns `{"ok": true, ...}`.
+
+### `pb_scc_set_target(target_file, flags=None)`
+
+Bind the connection to a target (`.pbt`) and return the PBLs it manages.
+`flags` is an optional list from `refresh_all`, `outofdate`, `importonly`,
+`exclude_checkout` (default: none). **Side effect**: this also sets the
+session's library list and current application, so a later
+`pb_set_library_list` / `pb_set_current_application` returns
+`PBORCA_DUPOPERATION (-2)`; skip them in the SCC flow. Returns
+`{"ok", "target_file", "flags", "count", "libraries"}`.
+
+### `pb_scc_refresh_target(rebuild_type="incremental")`
+
+Refresh the target's PBLs from `ws_objects/` (the "Refresh PBL" itself):
+add, modify, and delete entries to match the directory. `rebuild_type` is
+one of `"incremental"` (default), `"full"`, `"migrate"`, `"3pass"`. Returns
+`{"ok", "rebuild_type"}`; compile diagnostics surface through
+`pb_get_last_compile_errors`.
+
+### `pb_scc_exclude_library_list(lib_names)`
+
+Exclude specific PBLs (by name) from SCC management for the current target,
+e.g. vendored `.pbd` snapshots you don't want refreshed. Returns
+`{"ok", "count", "libraries"}`.
+
+### `pb_scc_get_connect_properties(workspace_file)`
+
+Read the SCC connection block from a `.pbw` (read-only; opens no
+connection). Returns the block's fields (`provider_name`, `user_id`,
+`project`, `local_proj_path`, `aux_path`, `log_file`, `capabilities`, …). On
+a git/svn workspace with no SCC block this returns `PBORCA_REGREADERROR
+(-23)`, which is expected; `pb_scc_connect_offline` tolerates it.
+
+### `pb_scc_close()`
+
+Close the SCC connection. No-op when not connected. Returns `{"ok": true}`.
+
 ---
 
 ## Error name reference
