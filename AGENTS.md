@@ -1,13 +1,13 @@
-# AGENTS.md — pb-orca-mcp
+# AGENTS.md: pb-orca-mcp
 
 Instructions for AI coding agents working on **this repository's code** (the
 cross-tool [AGENTS.md](https://agents.md) format, read by Codex, Cursor,
 Copilot, Zed, Claude Code, …). This is the agent-facing companion to
-[`CONTRIBUTING.md`](CONTRIBUTING.md) — **not** for end users driving the MCP
+[`CONTRIBUTING.md`](CONTRIBUTING.md), not the guide for end users driving the MCP
 server (they read the [README](README.md) and [`docs/`](docs/)).
 
 **Contributing needs no AI.** If you *are* an AI agent contributing here,
-**follow [`CONTRIBUTING.md`](CONTRIBUTING.md)** — it is the source of truth for
+**follow [`CONTRIBUTING.md`](CONTRIBUTING.md)**: it is the source of truth for
 setup, the `pytest` / `ruff` / `mypy` checks, code style, and the PR process.
 This file does not restate it; it adds only the domain knowledge that guide is
 not the place for.
@@ -17,18 +17,18 @@ not the place for.
 `pb-orca-mcp` is a **Python MCP server** that exposes PowerBuilder's ORCA API
 as MCP tools, letting any MCP agent (any client, any model) drive PB headless:
 inspect PBLs, compile entries, rebuild targets, build EXE / PBD / dynamic
-library. General-purpose — audience: anyone developing PowerBuilder who wants
+library. General-purpose, audience: anyone developing PowerBuilder who wants
 an agentic workflow.
 
 ## Architectural constraints
 
-- **This is a Python repo that talks *to* PowerBuilder via the DLL — no
+- **This is a Python repo that talks *to* PowerBuilder via the DLL: no
   PowerBuilder syntax lives here.**
 - **Pure ORCA: never write `.sr*` files to disk.** The server works in-memory →
   `.pbl`. Writing the source-of-truth file (the `$PBExportHeader$` header +
   encoding/BOM + CRLF) is the caller's job (see `docs/usage.md` Recipe 1.5);
   this repo is independent of any external tool for that step.
-- **No PowerGen / OrcaScript / `.gen` files** — legacy batch workflow, out of scope.
+- **No PowerGen / OrcaScript / `.gen` files**: legacy batch workflow, out of scope.
 
 ## Gotchas
 
@@ -73,7 +73,7 @@ an agentic workflow.
 ## Design notes (why these choices)
 
 - **Explicit PB version selection.** `pb_session_open` takes `pb_version` or
-  `install_path` — never auto-picked. PB `.pbt`/`.pbw` files do **not** carry
+  `install_path`, never auto-picked. PB `.pbt`/`.pbw` files do **not** carry
   the PB version (only the frozen magic constant `Save Format v3.0(19990112)`),
   so there is nothing to infer from.
 - **`.pbt` / `.pbw` format** (verified on real PB 19/22/25 files): `key "value";`
@@ -82,11 +82,11 @@ an agentic workflow.
   `@begin Targets … @end;` plus `DefaultTarget` / `DefaultExportEncode`. No PB
   version in either.
 - **ORCA functions deliberately NOT exposed:** `PBORCA_BuildProject*` (deprecated
-  in R3 — use `ApplicationRebuild`); `PBORCA_LibraryEntryCopy` (redundant with
+  in R3, use `ApplicationRebuild`); `PBORCA_LibraryEntryCopy` (redundant with
   `Move` + `Export` + `CompileEntryImport`); `Scc*` online / MSSCCI (only the
   offline git/svn flow is exposed = "Refresh PBL").
 - **Functions that do NOT exist in ORCA** (verified against `PBORCA.H` 19/22/25):
-  `PBORCA_LibraryEntryCommentModify` — change an entry's comment by re-importing
+  `PBORCA_LibraryEntryCommentModify`. Change an entry's comment by re-importing
   it with `CompileEntryImport` + a new `lpszComments`. (`PBORCA_LibraryCommentModify`
   exists, but edits the PBL's own comment.)
 

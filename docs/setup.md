@@ -1,18 +1,18 @@
 # Installation & setup
 
 Install `pb-orca-mcp`, register it with your MCP client, and verify it can
-see your PowerBuilder install. It is a standard MCP server — any MCP client
+see your PowerBuilder install. It is a standard MCP server: any MCP client
 (Claude Code, Cursor, Codex CLI, Gemini CLI, Copilot, …) driving any model
 can use it.
 
 ## Requirements
 
-- **Windows**. ORCA is a Win32 DLL — no macOS / Linux build.
+- **Windows**. ORCA is a Win32 DLL, with no macOS / Linux build.
 - **PowerBuilder, IDE edition**. Runtime-only installs don't ship `pborc.dll`.
   Tested with **PB 2019 R3**, **2022 R3**, **2025**; the ABI has been stable
   since PB 2019, so other releases should work too (not in the CI matrix).
 - **Python 3.10+**, with the **same architecture** as the PB install (see
-  [x86 vs x64](#x86-vs-x64--the-most-common-gotcha)). `uv` provides it for you.
+  [x86 vs x64](#x86-vs-x64-the-most-common-gotcha)). `uv` provides it for you.
 
 ## Install
 
@@ -20,7 +20,7 @@ can use it.
 straight from the GitHub repo.
 
 ```pwsh
-# Use it — no clone. Pin a release by appending @<tag> to the URL.
+# Use it without a clone. Pin a release by appending @<tag> to the URL.
 uvx --from git+https://github.com/restoresrl/pb-orca-mcp pb-orca-mcp doctor
 
 # Or install it as a persistent tool, so `pb-orca-mcp` is on PATH:
@@ -35,7 +35,7 @@ git clone https://github.com/restoresrl/pb-orca-mcp
 uvx --from .\pb-orca-mcp pb-orca-mcp doctor
 ```
 
-## Verify — `doctor`
+## Verify with `doctor`
 
 `pb-orca-mcp doctor` lists every PB IDE install found, with version, arch,
 the `pborc.dll` that would load, and whether it's usable from the current
@@ -54,10 +54,10 @@ Python: 3.12.0 (x86)
 Doctor OK: 1 usable install(s) for x86 Python.
 ```
 
-`[OK]` marks a tested major (`19.0`, `22.0`, `25.0`); `[??]` an untested one
-— still attempted (ABI stable since PB 2019).
+`[OK]` marks a tested major (`19.0`, `22.0`, `25.0`); `[??]` an untested one,
+still attempted (ABI stable since PB 2019).
 
-## x86 vs x64 — the most common gotcha
+## x86 vs x64: the most common gotcha
 
 PB IDE is historically **x86** through 2025 (`C:\Program Files (x86)\Appeon\
 PowerBuilder N.0\`). `ctypes` can't load an x86 DLL from x64 Python, or vice
@@ -72,7 +72,7 @@ uvx --from git+https://github.com/restoresrl/pb-orca-mcp --python 3.12-x86 pb-or
 
 ## Register the server with your MCP client
 
-Registration uses the standard MCP `mcpServers` block — **the same JSON
+Registration uses the standard MCP `mcpServers` block, **the same JSON
 everywhere**; only the file it goes in differs per client:
 
 ```json
@@ -90,7 +90,7 @@ everywhere**; only the file it goes in differs per client:
 |---|---|
 | Claude Code | `.claude/mcp.json` (project) or `~/.claude/mcp.json` (user) |
 | Cursor | `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user) |
-| Codex CLI / Gemini CLI / Copilot / others | the client's MCP config — see its docs for the exact path |
+| Codex CLI / Gemini CLI / Copilot / others | the client's MCP config (see its docs for the exact path) |
 
 The block contents are identical; only confirm the file location for your
 client. After saving, reload the client and confirm the `pb_*` tools appear
@@ -105,10 +105,10 @@ client's MCP log for the server's stderr.
 The server discovers every install, but each session targets one. Two ways
 to pin:
 
-- **Per session** — pass `pb_version` on `pb_session_open`
+- **Per session**: pass `pb_version` on `pb_session_open`
   (`{"pb_version": "22.0"}`); this is what an agent does when you say "use
   PB 2022 R3".
-- **Per server** — restrict discovery via an env var in the config:
+- **Per server**: restrict discovery via an env var in the config:
 
 ```json
 {
@@ -130,9 +130,9 @@ before `"pb-orca-mcp"`.
 
 Two optional skills give an agent the *know-how* to use the tools well:
 
-- **`pb-orca`** — the session lifecycle, the four phases (understand →
+- **`pb-orca`**: the session lifecycle, the four phases (understand →
   change → validate → build), and the ORCA gotchas.
-- **`pb-workflow`** — the `.pbl ↔ ws_objects/` source-of-truth editing model
+- **`pb-workflow`**: the `.pbl ↔ ws_objects/` source-of-truth editing model
   and the add/delete integrity check.
 
 They are written to the [Agent Skills](https://agentskills.io) `SKILL.md`
@@ -143,7 +143,7 @@ skill folder into your agent's skills directory:
 |---|---|
 | Claude Code | `~/.claude/skills/` (user) or `<workspace>/.claude/skills/` (project) |
 | Codex CLI | `~/.codex/skills/` |
-| Others | the agent's skills location — see its docs |
+| Others | the agent's skills location (see its docs) |
 
 ```pwsh
 # from a clone of this repo, e.g. for Claude Code:
@@ -151,7 +151,7 @@ Copy-Item -Recurse .claude/skills/pb-orca     ~/.claude/skills/
 Copy-Item -Recurse .claude/skills/pb-workflow ~/.claude/skills/
 ```
 
-The skills aren't required — the docs here cover the same ground for clients
+The skills aren't required: the docs here cover the same ground for clients
 without skills. With them, the agent knows the session order, the
 export-header requirement, and the source-of-truth model up front (fewer
 wrong turns).
@@ -160,13 +160,13 @@ wrong turns).
 
 The server merges three sources (later ones only fill gaps):
 
-1. **`PB_INSTALL_PATH`** env var — explicit override (single root or
+1. **`PB_INSTALL_PATH`** env var, the explicit override (single root or
    `;`-separated list).
-2. **Windows registry** `HKLM\SOFTWARE\WOW6432Node\Sybase\PowerBuilder\<X.0>`
-   — `Location` + `IPS Name` (path), `Build` (version), `BuildFlag`
+2. **Windows registry** `HKLM\SOFTWARE\WOW6432Node\Sybase\PowerBuilder\<X.0>`:
+   `Location` + `IPS Name` (path), `Build` (version), `BuildFlag`
    (product name). Appeon kept the legacy Sybase key.
-3. **Filesystem scan** of `C:\Program Files{,(x86)}\Appeon\PowerBuilder *.0\`
-   — siblings without `IDE\pborc.dll` filtered out.
+3. **Filesystem scan** of `C:\Program Files{,(x86)}\Appeon\PowerBuilder *.0\`,
+   with siblings lacking `IDE\pborc.dll` filtered out.
 
 Version metadata comes from the registry when present, else the DLL's PE
 `VS_VERSION_INFO` resource.
@@ -191,7 +191,7 @@ Version metadata comes from the registry when present, else the DLL's PE
 uv tool uninstall pb-orca-mcp        # or: pipx uninstall pb-orca-mcp
 ```
 
-`uvx --from` installs nothing persistent — nothing to uninstall (optionally
+`uvx --from` installs nothing persistent, so there is nothing to uninstall (optionally
 `uv cache clean`). The MCP client launches the server on connect and stops
 it on disconnect; to force-stop, kill the `pb-orca-mcp` (or `uvx`) process.
 The package owns no on-disk state.

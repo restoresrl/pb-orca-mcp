@@ -41,13 +41,13 @@ Enumerate PowerBuilder IDE installations on the local machine.
 ```
 
 `tested: true` means the major version is in the project's `KNOWN_VERSIONS`
-tuple (`19.0`, `22.0`, `25.0`) — the actively tested set. Untested majors
+tuple (`19.0`, `22.0`, `25.0`), the actively tested set. Untested majors
 are still returned with `tested: false`; load is attempted optimistically.
 
 ### `pb_target_info(path)`
 
 Parse a PowerBuilder `.pbt` (target) or `.pbw` (workspace) file. Does **not**
-return the PB version — `.pbt`/`.pbw` carry only the file-format magic
+return the PB version: `.pbt`/`.pbw` carry only the file-format magic
 constant (`Save Format v3.0(19990112)` since 1999), not a release marker.
 Version selection must be explicit on `pb_session_open`.
 
@@ -102,7 +102,7 @@ time raises `PB_ORCA_MCP_STATEERROR`.
 
 **Output** (errors): `PB_ORCA_MCP_INVALIDARGS` (neither arg supplied),
 `PB_ORCA_MCP_VERSIONNOTFOUND`, `PB_ORCA_MCP_VERSIONAMBIGUOUS` (multiple installs
-of the same major — disambiguate with `install_path`),
+of the same major: disambiguate with `install_path`),
 `PB_ORCA_MCP_INSTALLNOTFOUND` (path didn't match any discovered install),
 `PB_ORCA_MCP_LOADFAILED` (DLL refused to load), `PB_ORCA_MCP_STATEERROR`
 (session already open).
@@ -116,7 +116,7 @@ Close the ORCA session if open. Idempotent.
 ### `pb_set_current_application(app_lib, app_name)`
 
 Configure the current target's application object. `PBORCA_LIBLISTNOTSET (-5)`
-is the most common error here — call `pb_set_library_list` first.
+is the most common error here: call `pb_set_library_list` first.
 
 **Output** (success): `{"ok": true, "app_lib": "...", "app_name": "..."}`.
 
@@ -200,12 +200,12 @@ Move an entry between PBLs.
 ### `pb_library_comment_modify(lib_path, comments)`
 
 Update the PBL-level comment. **There is no per-entry comment-modify in
-ORCA** — to change an entry's comment, re-import it via
+ORCA**: to change an entry's comment, re-import it via
 `pb_compile_entry_import` with the new `comments` argument.
 
 ---
 
-## Compile loop — the core agentic value
+## Compile loop: the core agentic value
 
 All compile/rebuild tools return `{"success": bool, "errors": [...]}`. The
 `errors` array carries per-diagnostic dicts:
@@ -224,7 +224,7 @@ All compile/rebuild tools return `{"success": bool, "errors": [...]}`. The
 `level_name` follows the convention `0=error / 1=warning / 2=information`
 (the C header doesn't formalize this; raw `level` is always available).
 `PBORCA_COMPERROR (-11)` and `PBORCA_LINKERROR (-12)` are **not** raised
-as exceptions — they're normal "compile produced diagnostics" outcomes
+as exceptions: they're normal "compile produced diagnostics" outcomes
 and surface as `success: false` with populated `errors`.
 
 ### `pb_compile_entry_import(lib_path, entry_name, entry_type, syntax, comments="")`
@@ -303,7 +303,7 @@ unset.
 ### `pb_dynamic_library_create(lib_path, *, pbr_name=None, flags=None)`
 
 Build a single `.pbd` from a `.pbl`. No link callback (the C API doesn't
-expose one for this entry point) — failures surface as the raw ORCA return
+expose one for this entry point): failures surface as the raw ORCA return
 code in an `error` envelope.
 
 ---
@@ -319,7 +319,7 @@ first, not including the entry itself.
 
 ### `pb_object_query_reference(lib_path, entry_name, entry_type)`
 
-List the entries that the named object references — its **outgoing**
+List the entries that the named object references, its **outgoing**
 dependencies (callees, ancestors used, types declared, windows opened,
 etc.). This is the outgoing direction of the cross-reference graph;
 ORCA does not expose an incoming-direction primitive, so finding
@@ -362,7 +362,7 @@ response shape as the compile tools: `{"success", "errors", ...}`.
 | `PB_ORCA_MCP_INVALIDARGS` | Caller-supplied argument failed validation |
 | `PB_ORCA_MCP_STATEERROR` | Operation requires (or forbids) an open session |
 | `PB_ORCA_MCP_VERSIONNOTFOUND` | No PB install with the requested `pb_version` |
-| `PB_ORCA_MCP_VERSIONAMBIGUOUS` | Multiple installs share a major — pass `install_path` |
+| `PB_ORCA_MCP_VERSIONAMBIGUOUS` | Multiple installs share a major: pass `install_path` |
 | `PB_ORCA_MCP_INSTALLNOTFOUND` | `install_path` didn't match a discovered install |
 | `PB_ORCA_MCP_LOADFAILED` | `WinDLL` refused to load `pborc.dll` |
 
