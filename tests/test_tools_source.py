@@ -94,6 +94,19 @@ def test_workspace_info_reports_git(tmp_path: Path) -> None:
     info = source_tools.pb_workspace_info(str(lib))
     assert info["git_root"] == str(tmp_path)
     assert "pb_library_export_sources" in info["advice"]
+    assert info["outside_source_tree"] is False
+
+
+def test_workspace_info_flags_a_library_outside_the_projection(tmp_path: Path) -> None:
+    """The payload has to carry this as a field, not only as prose, so a
+    downstream tool can branch on it."""
+    _project(tmp_path, with_projection=True)
+    vendored = tmp_path / "dep" / "vendor.pbl"
+    vendored.parent.mkdir()
+    vendored.write_bytes(b"")
+    info = source_tools.pb_workspace_info(str(vendored))
+    assert info["outside_source_tree"] is True
+    assert info["mode"] == "pbl_only"
 
 
 # --------------------------- destination selection ---------------------------

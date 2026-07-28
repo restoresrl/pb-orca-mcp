@@ -94,6 +94,23 @@ root, so `<root>/src/app.pbl` projects to
 tree instead, so an existing `<lib>.pbl.src` directory found anywhere under
 `ws_objects/` wins over the computed location.
 
+### The third case: a library that is in the project but not of it
+
+There is a variant of `pbl_only` worth separating out. A workspace can keep a
+projection for its own libraries and, at the same time, contain libraries that
+have none: a vendored snapshot of a dependency pinned under `dep/`, or a
+commercial component dropped next to the project's own `src/`. Both were found
+on real projects.
+
+`pb_workspace_info` reports these as `outside_source_tree: true` — the
+workspace has a `ws_objects/` tree, this library has no directory in it. It is
+a fact, not a guess, and it matters because such a library is normally replaced
+wholesale by whatever produced it rather than edited in place. Do not generate
+a projection for one, and check where it comes from before writing to it. The
+server cannot enforce that — "this directory is off limits" is a project
+policy, not a property of the filesystem — but it will not suggest the wrong
+thing either.
+
 ---
 
 ## 3. Case A: no `ws_objects/` (the `.pbl` is the source of truth)

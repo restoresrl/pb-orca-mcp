@@ -115,8 +115,27 @@ class WorkspaceInfo:
     def to_dict(self) -> dict[str, Any]:
         """JSON-friendly form for the MCP tool payload."""
         data = asdict(self)
+        data["outside_source_tree"] = self.outside_source_tree
         data["advice"] = self.advice
         return data
+
+    @property
+    def outside_source_tree(self) -> bool:
+        """The workspace keeps a text projection, but not for *this* library.
+
+        A plain fact, not a guess: `<root>/ws_objects/` exists, and this
+        library has no directory under it. In practice that combination means
+        the library lives inside the project but is not tracked as source —
+        a vendored dependency snapshot, or a third-party component dropped
+        next to the project's own libraries. Both are common: a customization
+        that pins a built copy of its base product under `dep/`, or a
+        commercial PB component sitting in `src/`.
+
+        Worth branching on before writing. Such a library is usually meant to
+        be replaced wholesale by whatever produced it, not edited in place,
+        and it should certainly not have a text projection generated for it.
+        """
+        return self.mode == "pbl_only" and self.ws_objects_dir is not None
 
     @property
     def advice(self) -> str:
@@ -126,6 +145,13 @@ class WorkspaceInfo:
                 "Text projection present: every write to the .pbl must also rewrite the "
                 "matching .sr* file, and both go in the same commit. The file-based tools "
                 "and sync_sources='auto' do that for you."
+            )
+        if self.outside_source_tree:
+            return (
+                "This project keeps text sources, but not for this library: it sits "
+                "outside the ws_objects/ tree, which is what a vendored dependency or a "
+                "third-party component looks like. Check where it comes from before "
+                "writing to it, and do not generate a projection for it."
             )
         if self.git_root:
             return (

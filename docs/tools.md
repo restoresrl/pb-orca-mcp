@@ -109,6 +109,7 @@ unfamiliar project.
   "observed_encoding": "utf8",
   "git_root": "C:\\proj",
   "work_dir": "C:\\proj\\.pb-orca",
+  "outside_source_tree": false,
   "advice": "Text projection present: ..."
 }
 ```
@@ -121,6 +122,13 @@ unfamiliar project.
   already inconsistent: the IDE will rewrite those files on its next export.
 - `sources.source_dir` is populated even when `exists` is false, so a bootstrap
   knows where to write.
+- `outside_source_tree`: the workspace keeps a projection, but this library has
+  no directory under it. That combination is what a **vendored dependency
+  snapshot or a third-party component** looks like — a library that lives
+  inside the project but is not tracked as source. Such a library is normally
+  replaced wholesale by whatever produced it rather than edited in place, and
+  should not have a projection generated for it. Branch on this before writing;
+  `advice` says the same thing in prose.
 
 ---
 

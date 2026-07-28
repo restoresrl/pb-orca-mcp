@@ -33,6 +33,14 @@ That last row is the point: **ORCA behaves the same either way.** It always
 reads and writes the `.pbl`. The projection only changes what else has to
 happen, and the server does that part for you.
 
+One variant to watch for: `mode: "pbl_only"` together with
+`outside_source_tree: true` means the project *does* keep text sources, just
+not for this library. That is what a vendored dependency snapshot or a
+third-party component looks like — a library that lives inside the project but
+is not tracked as source. Such a library is normally replaced wholesale by
+whatever produced it, not edited in place. Do not generate a projection for it,
+and find out where it comes from before writing to it.
+
 ## What the server guarantees
 
 Every tool that writes to a `.pbl` — `pb_object_import_file`,

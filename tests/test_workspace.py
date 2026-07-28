@@ -141,6 +141,43 @@ def test_describe_detects_ws_objects(tmp_path: Path) -> None:
     assert "both" in info.advice or "same commit" in info.advice
 
 
+def test_a_library_outside_the_projection_tree_is_flagged(tmp_path: Path) -> None:
+    """A vendored or third-party library: the project keeps text sources, but
+    this one has no directory under ws_objects/.
+
+    Seen on real projects two ways — a customization pinning a built snapshot
+    of its base product under dep/, and a commercial component sitting in
+    src/. Both must not be offered a bootstrap.
+    """
+    _pbw(tmp_path)
+    _source_file(tmp_path / "ws_objects" / "src" / "app.pbl.src", "w_main.srw")
+    vendored = tmp_path / "dep" / "base" / "vendor.pbl"
+    vendored.parent.mkdir(parents=True)
+    vendored.write_bytes(b"")
+
+    info = ws.describe(vendored)
+    assert info.mode == "pbl_only"
+    assert info.outside_source_tree
+    assert "vendored" in info.advice
+    assert "pb_library_export_sources" not in info.advice
+
+
+def test_a_project_with_no_projection_at_all_is_not_flagged(tmp_path: Path) -> None:
+    """The binary-only project is a first-class layout, not a suspicious one."""
+    _pbw(tmp_path)
+    (tmp_path / "app.pbl").write_bytes(b"")
+    info = ws.describe(tmp_path / "app.pbl")
+    assert info.mode == "pbl_only"
+    assert not info.outside_source_tree
+
+
+def test_a_projected_library_is_not_flagged(tmp_path: Path) -> None:
+    _pbw(tmp_path)
+    (tmp_path / "app.pbl").write_bytes(b"")
+    _source_file(tmp_path / "ws_objects" / "app.pbl.src", "w_main.srw")
+    assert not ws.describe(tmp_path / "app.pbl").outside_source_tree
+
+
 def test_describe_without_a_workspace_file_uses_the_library_directory(tmp_path: Path) -> None:
     lib = tmp_path / "standalone" / "app.pbl"
     lib.parent.mkdir()
