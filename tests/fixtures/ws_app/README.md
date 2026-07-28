@@ -21,9 +21,13 @@ Contents:
   produces, which is the property the whole `ws_objects` sync depends on.
 
 `d_genapp_dw_test.srd` is plain text — no `Start of PowerBuilder Binary Data
-Section` block. Replacing it with a DataWindow that embeds a picture or an OLE
-object would extend the coverage to `bExportIncludeBinary`, the one export
-option still unproven.
+Section` block, and adding a picture to it would not produce one either
+(PowerBuilder writes a picture as `bitmap(filename="…")`, a reference). Only
+objects hosting an **OLE / ActiveX control** carry that block. Adding one here
+would let `test_export_to_file_is_byte_identical_to_the_ide_output` cover
+`bExportIncludeBinary` too; it is verified in `docs/how-it-works.md` §9 against
+a real codebase instead, because a fixture with an OLE control would only
+export identically on a machine where that control is registered.
 
 The binaries and the `.sr*` files are marked `binary` in `.gitattributes` so
 git preserves the BOM and CRLF byte-for-byte. A test that mutates any of this

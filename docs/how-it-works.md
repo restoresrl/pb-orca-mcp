@@ -253,8 +253,9 @@ match `DefaultExportEncode`, or whose line endings or BOM are wrong, causes a
 confusing Refresh failure in the IDE later. Letting ORCA write the file removes
 that entire class of bug, because the engine that defines the bytes is the one
 producing them. Byte-identity was verified against the IDE's own `ws_objects/`
-output for a window, a menu, an application object and a DataWindow; objects
-carrying an actual binary block are the one caveat (section 9).
+output for a window, a menu, an application object, a DataWindow, and a window
+hosting an OLE control (binary block included). Section 9 has the one caveat,
+which concerns OLE objects across PowerBuilder builds.
 
 ---
 
@@ -271,12 +272,16 @@ when you know what the bytes mean.
 $PBExportHeader$<entry>.<ext>          # line 1
 $PBExportComments$<object comment>     # line 2, only if the object has a comment
 <body>                                 # the object source, CRLF throughout
+Start of PowerBuilder Binary Data Section : Do NOT Edit
+<hex>                                  # only for objects hosting an OLE control
+End of PowerBuilder Binary Data Section : No Source Expected After This Point
 ```
 
 The `<body>` is, character for character, the same source text
 `pb_library_entry_export` returns in memory: the file is that body with the
 header (and optional comment) prepended and the chosen BOM in front. Nothing
-else is added.
+else is added, except the binary section on the rare objects that have one
+(section 9).
 
 ### 5.2 Encoding
 
@@ -486,14 +491,33 @@ Two other files to watch:
 
 ## 9. Limits and open questions
 
-**Objects with a binary part.** DataWindows can carry a binary block (an
-embedded picture, an OLE object), which needs `bExportIncludeBinary` on the
-export or the block is dropped from the file. pb-orca sets it for every file
-export. A DataWindow *does* round-trip byte-identically today — that is
-covered by a test — but the one in the fixture is plain text, with no
-`Start of PowerBuilder Binary Data Section` block, so the binary path itself
-is enabled and specified rather than proven. An object that actually carries
-one would settle it.
+**Objects with a binary part.** Some objects export with an extra
+`Start of PowerBuilder Binary Data Section` block, which is only written when
+`bExportIncludeBinary` is set. pb-orca sets it on every file export.
+
+What produces that block, established by grepping a real 2470-object codebase:
+**OLE / ActiveX controls**, and nothing else. Exactly two files in that
+codebase carry a binary section — an `olecustomcontrol` user object and the
+window that hosts it — and both also carry the `binarykey` property that names
+the embedded stream. A picture in a DataWindow does *not*: PowerBuilder writes
+it as `bitmap(... filename="image.png" ...)`, a reference to a file on disk,
+with no embedded bytes. Neither do plain windows, menus, functions,
+structures or ordinary DataWindows.
+
+Exporting one of those two objects through pb-orca reproduces the binary
+section, and the window came out **byte-identical** to the file the IDE had
+committed. Dropping the flag shrinks the same file from 10,934 to 2,760 bytes,
+so the option demonstrably does what it says.
+
+One caveat worth knowing if your project uses OLE controls. Two consecutive
+exports from the same PowerBuilder build are byte-identical, so the export is
+deterministic — but the *binary payload* of an OLE object can differ across PB
+builds. The other of the two objects came out the same length as the committed
+file with 358 bytes differing, all of them inside the OLE compound-storage
+block, when exported with a newer PB build than the one that had produced the
+committed file. So on a project with OLE-bearing objects, a sync can show a
+diff in the binary block even though nobody changed the source. The text part
+is unaffected.
 
 **`.pbg` registration**, as described in section 8.
 

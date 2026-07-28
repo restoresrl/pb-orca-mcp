@@ -104,10 +104,18 @@ an agentic workflow.
 - **`pb_scc_refresh_target` has side effects**: it writes a flat `.sr*` export
   plus a `.pbg` into `local_proj_path`. Documented, not a bug, but it is why
   the per-object import loop is the recommended path.
-- **`bExportIncludeBinary` is set on every file export** and DataWindows
-  round-trip byte-identically, but the fixture's `.srd` is plain text. The
-  binary-block path (a DataWindow embedding a picture or OLE object) is still
-  unproven; see `docs/how-it-works.md` §9.
+- **`bExportIncludeBinary` is set on every file export**, and it is what writes
+  the `Start of PowerBuilder Binary Data Section` block. Only **OLE/ActiveX
+  controls** produce that block (verified by grepping a 2470-object codebase:
+  exactly 2 hits, both `olecustomcontrol`-related, both carrying `binarykey`).
+  A picture in a DataWindow does not — PB writes `bitmap(filename="…")`, a
+  reference. Verified byte-identical against the IDE for an OLE-hosting window;
+  dropping the flag shrank the same file from 10,934 to 2,760 bytes.
+- **The OLE binary payload is deterministic within a PB build but not across
+  builds.** Two consecutive exports match; an export from a newer PB than the
+  one that wrote the committed file differed by 358 bytes, all inside the OLE
+  compound-storage block. So on projects with OLE controls a sync can show a
+  binary-only diff nobody caused. See `docs/how-it-works.md` §9.
 
 ## Design notes (why these choices)
 

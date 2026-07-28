@@ -303,13 +303,14 @@ def test_pbl_only_project_round_trip(tmp_path: Path) -> None:
 
 @pytest.mark.requires_pb
 def test_datawindow_round_trips_through_a_file(tmp_path: Path) -> None:
-    """DataWindows are the object kind that can carry a binary part, so they
-    get their own round trip rather than riding on the window cases.
+    """`.srd` gets its own round trip rather than riding on the window cases.
 
-    The fixture's DataWindow is plain text (no `Start of PowerBuilder Binary
-    Data Section` block), so this pins the `.srd` extension mapping and the
-    round trip; a DataWindow with an embedded picture or OLE object would be
-    needed to exercise `bExportIncludeBinary` itself.
+    The fixture's DataWindow is plain text, with no `Start of PowerBuilder
+    Binary Data Section` block — only objects hosting an OLE/ActiveX control
+    produce one, and a fixture with such a control would only export
+    identically on a machine where the control is registered. So this pins the
+    `.srd` extension mapping and the round trip; `bExportIncludeBinary` itself
+    is verified against a real codebase, see `docs/how-it-works.md` §9.
     """
     project = _ws_app(tmp_path)
     lib = str(project / "genapp.pbl")
