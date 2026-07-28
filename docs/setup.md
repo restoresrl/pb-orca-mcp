@@ -41,7 +41,7 @@ uvx --from .\pb-orca-mcp pb-orca-mcp doctor
 the `pborc.dll` that would load, and whether it's usable from the current
 Python:
 
-```
+```text
 pb-orca-mcp 0.1.0
 Python: 3.12.0 (x86)
 
@@ -87,7 +87,7 @@ everywhere**; only the file it goes in differs per client:
 ```
 
 | Client | Where the block goes |
-|---|---|
+| --- | --- |
 | Claude Code | `.claude/mcp.json` (project) or `~/.claude/mcp.json` (user) |
 | Cursor | `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user) |
 | Codex CLI / Gemini CLI / Copilot / others | the client's MCP config (see its docs for the exact path) |
@@ -130,31 +130,35 @@ before `"pb-orca-mcp"`.
 
 Two optional skills give an agent the *know-how* to use the tools well:
 
-- **`pb-orca`**: the session lifecycle, the four phases (understand →
-  change → validate → build), and the ORCA gotchas.
-- **`pb-workflow`**: the `.pbl ↔ ws_objects/` source-of-truth editing model
-  and the add/delete integrity check.
+- **`pb-orca`**: the session lifecycle, the export → edit → import loop, and
+  the ORCA gotchas.
+- **`pb-workflow`**: the two project shapes, what the server syncs for you,
+  and what to commit.
 
-They are written to the [Agent Skills](https://agentskills.io) `SKILL.md`
-standard, so any skill-aware agent can use them. Install by copying the
-skill folder into your agent's skills directory:
+They live in [`skills/`](../skills/) and are written to the
+[Agent Skills](https://agentskills.io) `SKILL.md` standard, so any skill-aware
+agent can use them. Install by copying the skill folder into your agent's
+skills directory:
 
 | Agent | Skills directory |
-|---|---|
+| --- | --- |
 | Claude Code | `~/.claude/skills/` (user) or `<workspace>/.claude/skills/` (project) |
 | Codex CLI | `~/.codex/skills/` |
 | Others | the agent's skills location (see its docs) |
 
 ```pwsh
 # from a clone of this repo, e.g. for Claude Code:
-Copy-Item -Recurse .claude/skills/pb-orca     ~/.claude/skills/
-Copy-Item -Recurse .claude/skills/pb-workflow ~/.claude/skills/
+Copy-Item -Recurse skills/pb-orca     ~/.claude/skills/
+Copy-Item -Recurse skills/pb-workflow ~/.claude/skills/
 ```
 
 The skills aren't required: the docs here cover the same ground for clients
-without skills. With them, the agent knows the session order, the
-export-header requirement, and the source-of-truth model up front (fewer
-wrong turns).
+without skills. With them, the agent knows the session order and the
+source-of-truth model up front, and takes fewer wrong turns.
+
+Claude Code users can alternatively install the whole thing — server plus both
+skills — as a plugin; `.claude-plugin/plugin.json` is that packaging. It is one
+optional channel, not the canonical home of anything.
 
 ## Discovery sources
 
@@ -174,7 +178,7 @@ Version metadata comes from the registry when present, else the DLL's PE
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
-|---|---|---|
+| --- | --- | --- |
 | `doctor`: "No PowerBuilder IDE installation found" | PB Runtime installed, not IDE | Install PB IDE; runtime packages don't ship `pborc.dll`. |
 | `doctor`: "No PB install is usable from this Python (x64)" | arch mismatch | Install an x86 Python (above). |
 | `doctor` lists install but `load failed: …` | DLL blocked (AV / Defender / SmartScreen) | Whitelist `<install>\IDE\pborc.dll` or reinstall the same PB version. |
@@ -183,6 +187,9 @@ Version metadata comes from the registry when present, else the DLL's PE
 | `pb_compile_*` → `PB_ORCA_MCP_STATEERROR` | no session open | Call `pb_session_open` first. |
 | Untested major loads but a tool returns `PBORCA_UNKNOWN(...)` | ABI drift from a pre-2019 release | Use PB 2019 R3 or later. |
 | `doctor` shows an install but `IPS Name` is missing | very old (pre-Appeon) layout | Set `PB_INSTALL_PATH` explicitly. |
+| `pb_library_entry_export` → "the session configuration would corrupt the transfer" | `pb_session_configure` left a non-Unicode encoding in effect | Call `pb_session_configure` with no arguments to reset, then retry. |
+| `pb_object_export_file` lands in `.pb-orca/` on a project that has `ws_objects/` | the projection directory for *that* library was not found | Check `pb_workspace_info`: `sources.source_dir` is where it looked. |
+| Every line of a `.sr*` shows as changed after an import | the source was imported with LF endings | Re-export the object and re-import the file without letting an editor normalize line endings. |
 
 ## Uninstall
 

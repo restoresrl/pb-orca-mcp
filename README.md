@@ -8,64 +8,64 @@ MCP server that exposes PowerBuilder's ORCA API (`pborc.dll`, shipped with
 every PB IDE install) as MCP tools. Any MCP client (Claude Code, Cursor,
 Codex, Gemini CLI, Copilot, …) driving any model can use it to bridge to
 PowerBuilder. It works with **any PB version that exposes ORCA**, and lets the
-agent inspect PBLs, compile entries, rebuild targets, and produce EXE/PBD
-artifacts. That closes the "edit → compile → read errors → fix" loop that
-PowerBuilder's GUI-only IDE otherwise keeps shut.
+agent inspect PBLs, edit objects through plain source files, compile, rebuild
+targets, and produce EXE/PBD artifacts. That closes the "edit → compile → read
+errors → fix" loop that PowerBuilder's GUI-only IDE otherwise keeps shut.
 
 ## Why
 
-PowerBuilder is a closed-world IDE: an agent can read and write the
-`.sr*` source files PB exports, but it cannot compile, validate, or build
-them without a human opening the IDE or running a batch tool like
-PowerGen. ORCA exposes the same primitives the IDE uses internally
-(sessions, library directories, compile/import, application rebuild,
-EXE/PBD creation, hierarchy and reference queries) over a flat C API.
-This project wraps that API as MCP tools so an agent can drive
-PowerBuilder directly.
+PowerBuilder is a closed-world IDE. Its code lives in a binary `.pbl`, and
+nothing outside the IDE can compile, validate or build it without a human
+opening a window or running a batch script. ORCA exposes the same primitives
+the IDE uses internally — sessions, library directories, source export and
+import, application rebuild, EXE/PBD creation, hierarchy and reference queries
+— over a flat C API. This project wraps that API as MCP tools so an agent can
+drive PowerBuilder directly.
 
 ## How it works: the agentic loop
 
-pb-orca hands the agent the same primitives the IDE uses internally, over
-MCP. The agent opens **one session** against a chosen PB install (in
-effect, it becomes the IDE without a window) and works through four phases:
+The agent opens **one session** against a chosen PB install and, in effect,
+becomes the IDE without a window.
 
-1. **Understand.** `pb_library_directory` lists what's in a `.pbl`,
-   `pb_library_entry_export` returns an object's source, and
-   `pb_object_query_hierarchy` / `pb_object_query_reference` walk
-   inheritance and outgoing references. The agent maps a PB codebase it
-   has never seen.
-2. **Change and validate** is the core loop. The agent imports new source
-   with `pb_compile_entry_import`; ORCA compiles it and returns
-   **structured errors** (object, line, column, message). The agent reads
-   the error, fixes it, and re-imports. This loop was impossible before:
-   the source crosses the C ABI and lands in the `.pbl` with no IDE window
-   in the way.
-3. **Validate broadly.** `pb_application_rebuild` recompiles the whole
-   target (full or incremental) to surface cascading breakage.
-4. **Build and sync.** `pb_executable_create` /
-   `pb_dynamic_library_create` produce EXE/PBD; on git-managed projects
-   `pb_scc_refresh_target` propagates `ws_objects/` into the `.pbl`.
-
-A concrete session, *"add a method to `n_cst_order` and confirm it
-compiles"*:
+The edit loop is three calls, and **no PowerScript knowledge is needed on
+either side of it**. ORCA writes the object out as a source file, the agent
+edits that file with ordinary file tools, ORCA compiles it back:
 
 ```text
 pb_session_open(22.0)
   → pb_set_library_list + pb_set_current_application
-  → pb_library_entry_export(n_cst_order)      # read the current source
-  → (agent edits the source)
-  → pb_compile_entry_import(...)              # import + compile
-  → on errors: read line/column/message, fix, re-import
-  → pb_application_rebuild(incremental)       # nothing else broke
+  → pb_object_export_file(n_cst_order)     # ORCA writes n_cst_order.sru
+  → (the agent edits that file)
+  → pb_object_import_file(...)             # compile + import
+  → on errors: read line/column/message, fix the file, import again
+  → pb_application_rebuild(incremental)    # confirm nothing else broke
 ```
 
-No IDE window is ever opened.
+The file ORCA produces is byte-identical to what the PB IDE writes on Save —
+export header, comment line, BOM, CRLF — so pb-orca never has to construct a
+byte of PowerBuilder's file format, and re-exporting an unchanged object leaves
+`git status` clean.
 
-**Boundaries.** pb-orca is an inspect / compile / build bridge through
-ORCA, not a release build runner (PowerGen and batch scripts stay), and
-it does not enforce source style or higher-level agentic orchestration.
-Those are the job of separate, optional tools (not included); pb-orca just
-reads and writes PowerBuilder libraries.
+**Two shapes of project, one loop.** Where that file lands is detected, not
+configured. On a project under source control, PowerBuilder keeps a text
+projection of every object under `ws_objects/`; there, the file *is* the source
+of truth and pb-orca edits it in place. On a binary-only project, the file is a
+working copy under `.pb-orca/` and the `.pbl` is the whole truth. The ORCA
+calls are identical either way.
+
+**Git always sees the change.** On a project with a text projection, every tool
+that writes to the `.pbl` also rewrites the matching `.sr*` file in the same
+call, and says which files it touched. Half-applied changes — a binary that
+moved while the reviewable text did not, or the reverse — are the one silent
+failure mode in this domain, and closing it is a property of the server rather
+than a rule you have to remember. [`docs/how-it-works.md`](docs/how-it-works.md)
+is the full account.
+
+**Boundaries.** pb-orca is an inspect / edit / compile / build bridge through
+ORCA. It is not a release build runner (batch build scripts keep their job), it
+does not parse or reformat PowerScript, and it does not run git or orchestrate
+anything. Those belong to separate, optional tools; pb-orca reads and writes
+PowerBuilder libraries.
 
 ## Quickstart
 
@@ -122,14 +122,24 @@ which installs are usable. Full prerequisites and the x86/x64 gotcha:
 ## What it exposes
 
 Every function in ORCA's public API maps to one MCP tool, grouped into
-discovery, session, library, compile, build, object-query, and SCC
+discovery, session, source files, library, compile, build, object-query and SCC
 operations. The [tool reference](docs/tools.md) lists each one with its
-input/output schema and examples.
+input/output schema and examples, and is checked against the live registry by a
+test so it cannot drift.
 
-Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/usage.md).
+Recipes: [`docs/usage.md`](docs/usage.md). The model underneath:
+[`docs/how-it-works.md`](docs/how-it-works.md).
 
 ## Architecture highlights
 
+- **ORCA writes the source files, not us.** `PBORCA_ConfigureSession` puts the
+  export in write-to-file mode, so the `.sr*` bytes come from the same engine
+  the IDE uses. No PowerScript, no file-format handling, and no encoding
+  guesswork lives in this codebase.
+- **Workspace detection, not configuration**: the projection directory, the
+  export encoding (`DefaultExportEncode`, with the existing files as a
+  fallback), and whether git is watching are all read off the project.
+  `pb_workspace_info` reports it in one call, with no ORCA session required.
 - **Multi-version**: discovery enumerates every PB IDE on the
   machine. Each install ships its own `pborc.dll` under `<install>\IDE\`;
   the loader picks the right one per session. PB 2019 R3 and later versions
@@ -147,16 +157,15 @@ Recipes and the `.pbl` ↔ `ws_objects/` editing model: [`docs/usage.md`](docs/u
 
 ## Status
 
-Alpha, in active development on `main`. `v0.1.0` is **tagged** (GitHub
-release, 2026-05-13); install it from the repo with `uv` (see
-[Quickstart](#quickstart)).
+Alpha, in active development on `main`.
 
-All of ORCA's public API is wired through to MCP tools. The ABI
-is verified against PB 2022 R3, and the same prototypes cover every release
-since PB 2019 (the ABI is stable); PB 2019 R3 and 2025 are exercised too.
-The test suite is green, including an end-to-end compile-test loop driven by
-an MCP agent (Claude Code, in our case) against a real PB 22.0 workspace;
-the PB-dependent tests skip cleanly when no local PB install is present.
+All of ORCA's public API is wired through to MCP tools. The ABI is verified
+against PB 2022 R3, and the same prototypes cover every release since PB 2019
+(the ABI is stable); PB 2019 R3 and 2025 are exercised too. The test suite is
+green, including a round-trip suite against real PB 22.0 workspaces in both
+shapes — one with a `ws_objects/` text projection, one binary-only — that pins
+the byte-identity and sync guarantees. PB-dependent tests skip cleanly when no
+local PB install is present.
 
 A GitHub-hosted, MIT-licensed project for PowerBuilder developers on Windows
 to use and contribute to. The repository is **currently private during
@@ -166,28 +175,34 @@ stability. There is no fixed date.
 ## Documentation
 
 - [`docs/setup.md`](docs/setup.md): install, register the server with your MCP client (per-client examples), x86 vs x64 Python, troubleshooting
+- [`docs/how-it-works.md`](docs/how-it-works.md): the `.pbl` / `ws_objects` model, verified ORCA behaviour, and the failure mode to avoid — start here
+- [`docs/usage.md`](docs/usage.md): recipes (edit loop, build, queries, reconciling after a merge)
 - [`docs/tools.md`](docs/tools.md): every MCP tool, input/output schema, examples
-- [`docs/usage.md`](docs/usage.md): recipes (compile loop, build, queries) plus the `.pbl` ↔ `ws_objects/` editing model
+- [`docs/integrating.md`](docs/integrating.md): the contract for tools built on top of this server
 
-Two optional agent skills, `pb-orca` (the engine/loop overview) and
-`pb-workflow` (the object-editing discipline), are written to the
-[Agent Skills](https://agentskills.io) `SKILL.md` standard, so any
+Two optional agent skills, `pb-orca` (the engine and the loop) and
+`pb-workflow` (what to commit), live in [`skills/`](skills/) and are written to
+the [Agent Skills](https://agentskills.io) `SKILL.md` standard, so any
 skill-aware agent can use them (Claude Code, Codex CLI, Gemini CLI, Copilot,
-Cursor, …). They are not required to use the server; the docs cover the same
-ground for clients without skills. Install instructions per agent are in
+Cursor, …). They are not required; the docs cover the same ground for clients
+without skills. Install instructions per agent are in
 [`docs/setup.md`](docs/setup.md).
 
 ## Related projects
 
+Both are optional and neither is needed to use this server.
+
 - [`pb-format`](https://github.com/restoresrl/pb-format): a standalone
   PowerScript style formatter (CLI + library), extracted from this repo.
-  ORCA-independent; pair it with `pb-orca-mcp` to normalize `.sr*`
-  sources before importing them.
+  ORCA-independent; pair it with `pb-orca-mcp` if you want `.sr*` sources
+  normalized to a house style before importing them.
 - [`pb-ai-code`](https://github.com/restoresrl/pb-ai-code): an agentic dev
   kit for PowerBuilder built on top of `pb-orca-mcp`: skills, ingested
   Appeon docs, test orchestration, debugging patterns, and slash
   commands for full agentic PB development (design, code, test, debug).
-  Currently in design phase; planned to build on this server.
+  Currently in design phase. If you are building something similar, the
+  contract it relies on is written down in
+  [`docs/integrating.md`](docs/integrating.md).
 
 ## License
 

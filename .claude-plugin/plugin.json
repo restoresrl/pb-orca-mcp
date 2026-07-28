@@ -2,16 +2,12 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin.json",
   "name": "pb-orca-mcp",
   "version": "0.1.0",
-  "description": "PowerBuilder object editing and build automation through the ORCA API. Bundles the pb-orca MCP server with a workflow skill that covers the source-of-truth model (ws_objects/ on git projects, .pbl on standalone) and the .pbl ↔ ws_objects/ propagation rules.",
+  "description": "Drive PowerBuilder headlessly through the ORCA API: inspect PBLs, export an object to a file, compile it back, build EXE/PBD, and keep the ws_objects/ text projection in step so git sees every change. Bundles the MCP server with the two agent skills.",
   "keywords": ["powerbuilder", "pb", "orca", "pbl", "ws_objects", "appeon"],
 
-  "_TODO_marketplace_distribution": [
-    "Step B (future session): register this plugin in a marketplace as ONE optional install channel for Claude Code users.",
-    "Options for the marketplace manifest:",
-    "  - GitHub mirror of this repo with .claude-plugin/marketplace.json at the root,",
-    "  - dedicated marketplace repo (e.g. github.com/<org>/claude-plugins),",
-    "  - local directory marketplace for development (file://...).",
-    "After publication, register on the user side via extraKnownMarketplaces in ~/.claude/settings.json, then install with the /plugin command.",
-    "Note: the skills are agentskills-standard SKILL.md files usable by any skill-aware agent; this plugin is just the Claude Code packaging of them, not their canonical home. The agnostic docs (docs/usage.md, docs/setup.md) are the cross-agent source of truth."
+  "_note": [
+    "This manifest is only the Claude Code packaging of a client-neutral project, and one optional install channel among several.",
+    "The skills under skills/ are agentskills-standard SKILL.md files any skill-aware agent can load, and docs/ is the cross-client source of truth.",
+    "Nothing here is required: registering the server with any MCP client is a standard mcpServers block. See docs/setup.md."
   ]
 }

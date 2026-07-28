@@ -71,9 +71,56 @@ Version selection must be explicit on `pb_session_open`.
   "kind": "pbw",
   "workspace_name": "myws",
   "targets": ["src\\main.pbt", "src\\tools.pbt"],
-  "default_target": "src\\main.pbt"
+  "default_target": "src\\main.pbt",
+  "default_export_encode": "UTF-8"
 }
 ```
+
+`default_export_encode` is the encoding the IDE writes `ws_objects/` files in
+(`UTF-8`, `UTF-16BOM`, `ANSI`). Empty when the directive is absent, in which
+case UTF-8 is assumed.
+
+### `pb_workspace_info(lib_path)`
+
+Describe the workspace around a `.pbl`: whether it keeps a `ws_objects/` text
+projection, where that projection is, which encoding it uses, whether git is
+watching, and where working files go when there is no projection. Needs no
+ORCA session and no PowerBuilder install, so it is safe as a first call on an
+unfamiliar project.
+
+**Input**: `{"lib_path": "C:\\proj\\src\\app.pbl"}`.
+
+**Output**:
+```json
+{
+  "root": "C:\\proj",
+  "workspace_file": "C:\\proj\\proj.pbw",
+  "mode": "ws_objects",
+  "ws_objects_dir": "C:\\proj\\ws_objects",
+  "sources": {
+    "lib_path": "C:\\proj\\src\\app.pbl",
+    "source_dir": "C:\\proj\\ws_objects\\src\\app.pbl.src",
+    "exists": true,
+    "file_count": 214
+  },
+  "export_encode": "UTF-8",
+  "orca_encoding": "utf8",
+  "encoding_source": "pbw",
+  "observed_encoding": "utf8",
+  "git_root": "C:\\proj",
+  "work_dir": "C:\\proj\\.pb-orca",
+  "advice": "Text projection present: ..."
+}
+```
+
+- `mode`: `ws_objects` (the text files are the source of truth) or `pbl_only`
+  (the `.pbl` is).
+- `encoding_source`: `pbw` (declared), `observed` (sniffed from an existing
+  `.sr*` because the `.pbw` is silent), or `default`.
+- `observed_encoding` differing from `export_encode` means the workspace is
+  already inconsistent: the IDE will rewrite those files on its next export.
+- `sources.source_dir` is populated even when `exists` is false, so a bootstrap
+  knows where to write.
 
 ---
 
@@ -120,12 +167,146 @@ is the most common error here: call `pb_set_library_list` first.
 
 **Output** (success): `{"ok": true, "app_lib": "...", "app_name": "..."}`.
 
+### `pb_session_configure(export_encoding="unicode", export_headers=False, export_include_binary=False, export_to_file=False, export_directory=None, import_encoding="unicode", debug=False)`
+
+`PBORCA_ConfigureSession` — the session-wide ORCA options: export encoding,
+export headers, write-to-file mode and its target directory, import encoding,
+and the debug compiler directive. Calling it with no arguments resets the
+session to ORCA's defaults.
+
+The source-file tools set and restore this themselves, so you rarely need it
+directly; it is exposed because it is part of ORCA's public API and because
+`debug` has no other entry point.
+
+**Careful**: `export_encoding` applies to in-memory exports too, where anything
+other than `unicode` packs those bytes into a wide buffer and the decoded
+string comes back mangled. `pb_library_entry_export` and
+`pb_compile_entry_import` refuse to run while such a configuration is in
+effect rather than returning plausible garbage.
+
+**Output**: `{"ok": true, "config": {...}}` — the configuration applied.
+
 ### `pb_set_library_list(libraries)`
 
 Set the library list (`.pbl`/`.pbd` paths) for the current session. The
 list cannot be empty. Path separators are passed through as-is to ORCA.
 
 **Output** (success): `{"ok": true, "libraries": [...]}`.
+
+---
+
+## Source files: the export → edit → import loop
+
+The three tools an agent uses to change PowerBuilder code. ORCA writes and
+reads the `.sr*` file; the caller edits it with ordinary file tools; nothing in
+this server parses PowerScript.
+
+Every tool here keeps the text projection and the `.pbl` in step. See
+[`how-it-works.md`](how-it-works.md) for why that matters and what breaks
+without it.
+
+### `pb_object_export_file(lib_path, entry_name, entry_type, dest_dir=None)`
+
+Write an object's source to a `.sr*` file and return its path. ORCA produces
+the bytes — export header, `$PBExportComments$`, BOM, CRLF — so the file is
+byte-identical to what the PB IDE writes on Save.
+
+The destination is detected unless `dest_dir` says otherwise:
+
+| Project | Destination | `is_source_of_truth` |
+| --- | --- | --- |
+| keeps `ws_objects/` | the library's `ws_objects/<lib>.pbl.src/` | `true` |
+| binary-only | `<workspace>/.pb-orca/` | `false` |
+
+Exporting an unchanged object into a projection rewrites the same bytes, so it
+leaves `git status` clean. A working directory created inside a git repo gets a
+self-ignoring `.gitignore`; the repository's own `.gitignore` is never touched.
+
+**Output**:
+```json
+{
+  "ok": true,
+  "file_path": "C:\\proj\\ws_objects\\app.pbl.src\\w_main.srw",
+  "lib_path": "C:\\proj\\app.pbl",
+  "entry_name": "w_main",
+  "entry_type": "window",
+  "encoding": "utf8",
+  "export_encode": "UTF-8",
+  "bytes": 713,
+  "mode": "ws_objects",
+  "is_source_of_truth": true
+}
+```
+
+### `pb_object_import_file(file_path, lib_path, entry_name=None, entry_type=None, comments=None, sync_sources="auto")`
+
+Compile a `.sr*` file into the `.pbl`, then refresh the text projection.
+
+`entry_name`, `entry_type` and `comments` default to the file's stem, its
+extension, and its `$PBExportComments$` line, so a file produced by
+`pb_object_export_file` round-trips with no extra arguments. An entry that does
+not exist yet is created.
+
+The file is read without translating line endings. PowerBuilder stores CRLF,
+and importing LF-normalized text rewrites every line inside the `.pbl`, which
+surfaces later as a whole-file phantom diff.
+
+On success, with `sync_sources="auto"` and a project that keeps a projection,
+ORCA rewrites the projection file so the text on disk is exactly what the
+`.pbl` now holds. That is what keeps git honest. `sync_sources="never"` skips
+it.
+
+**Output**:
+```json
+{
+  "success": true,
+  "lib_path": "C:\\proj\\app.pbl",
+  "entry_name": "w_main",
+  "entry_type": "window",
+  "file_path": "C:\\proj\\ws_objects\\app.pbl.src\\w_main.srw",
+  "file_encoding": "utf8",
+  "errors": [],
+  "synced_files": ["C:\\proj\\ws_objects\\app.pbl.src\\w_main.srw"],
+  "sync": "ok"
+}
+```
+
+`sync` is `ok`, `not_applicable` (no projection), `never`, or `failed` (with
+`sync_error`). On a compile error nothing is synced, `errors` carries the
+diagnostics, and the file is left exactly as you wrote it. ORCA does still
+write the partial source into the `.pbl` on a failed import, so fix the file
+and re-import rather than assuming the entry was untouched.
+
+### `pb_library_export_sources(lib_path, dest_dir=None, entry_type="any")`
+
+Export every object in a library to `.sr*` files, through ORCA. Two uses: read
+a whole library as grep-able text in one call, or bootstrap the
+`ws_objects/<lib>.pbl.src/` tree on a project that only ever had the binary,
+turning opaque binary commits into reviewable diffs.
+
+`dest_dir` defaults to the library's projection directory, created if missing.
+Entry kinds with no source form (`project`, `proxyobject`, `binary`) are always
+skipped.
+
+**Output**:
+```json
+{
+  "ok": true,
+  "lib_path": "C:\\proj\\app.pbl",
+  "dest_dir": "C:\\proj\\ws_objects\\app.pbl.src",
+  "encoding": "utf8",
+  "count": 4,
+  "written": [
+    {"entry_name": "w_main", "entry_type": "window",
+     "file_path": "C:\\proj\\ws_objects\\app.pbl.src\\w_main.srw", "bytes": 713}
+  ],
+  "skipped": [],
+  "failed": []
+}
+```
+
+`ok` is false when any entry failed; the rest still got written, and `failed`
+carries one error envelope per entry.
 
 ---
 
@@ -136,6 +317,11 @@ list cannot be empty. Path separators are passed through as-is to ORCA.
 Create an empty `.pbl` at `lib_path`. `comments` is the PBL-level comment.
 
 ### `pb_library_delete(lib_path)`
+
+Deletes the PBL. Deliberately leaves the library's
+`ws_objects/<lib>.pbl.src/` directory in place: dropping a tree of
+version-controlled source as a side effect of one call is worse than leaving
+an orphan, which `git status` shows you anyway.
 
 Delete a `.pbl` from disk.
 
@@ -184,18 +370,29 @@ Metadata for a single entry.
 
 ### `pb_library_entry_export(lib_path, entry_name, entry_type)`
 
-Export the source of an entry as a string. The wrapper auto-resizes the
-buffer (64 KiB initial, retries on `PBORCA_BUFFERTOOSMALL`).
+Export the source of an entry as a string, in memory. The wrapper auto-resizes
+the buffer (64 KiB initial, retries on `PBORCA_BUFFERTOOSMALL`).
+
+Returns the object **body**: no `$PBExportHeader$` line, no
+`$PBExportComments$` line, because those belong to the on-disk file format
+rather than to the object. Use `pb_object_export_file` when you want the file.
 
 **Output**: `{"lib_path", "entry_name", "entry_type", "source": "<text>"}`.
 
-### `pb_library_entry_delete(lib_path, entry_name, entry_type)`
+### `pb_library_entry_delete(lib_path, entry_name, entry_type, sync_sources="auto")`
 
-Remove a single entry from a PBL.
+Remove a single entry from a PBL, and its text projection file with it. A
+surviving `.sr*` would resurrect the object on the next Refresh, so the
+default is to remove both; `sync_sources="never"` keeps the file.
 
-### `pb_library_entry_move(source_lib, dest_lib, entry_name, entry_type)`
+**Output**: adds `{"removed_files": [...], "sync": "ok"}`.
 
-Move an entry between PBLs.
+### `pb_library_entry_move(source_lib, dest_lib, entry_name, entry_type, sync_sources="auto")`
+
+Move an entry between PBLs. The projection follows: the `.sr*` is removed from
+the source library's directory and written fresh into the destination's.
+
+**Output**: adds `{"removed_files": [...], "synced_files": [...], "sync": "ok"}`.
 
 ### `pb_library_comment_modify(lib_path, comments)`
 
@@ -227,21 +424,27 @@ All compile/rebuild tools return `{"success": bool, "errors": [...]}`. The
 as exceptions: they're normal "compile produced diagnostics" outcomes
 and surface as `success: false` with populated `errors`.
 
-### `pb_compile_entry_import(lib_path, entry_name, entry_type, syntax, comments="")`
+### `pb_compile_entry_import(lib_path, entry_name, entry_type, syntax, comments="", sync_sources="auto")`
 
-Compile + import a single entry's source into a PBL. `syntax` is the full
-PB-style source text including the `$PBExportHeader$<name>.<ext>` first line.
+Compile + import a single entry's source into a PBL, from a string in memory.
+`pb_object_import_file` is the better tool when the source is a file; use this
+one for a small, surgical change you already hold.
 
-This imports `syntax` from memory into the `.pbl`; it does **not** write
-the `.sr*` source file on disk. To persist the on-disk source-of-truth
-correctly, write it yourself with the canonical export header + the
-workspace encoding/BOM + CRLF (plain editors tend to strip the BOM or flip
-line endings). The write recipe is in
-[`usage.md`](usage.md) Recipe 1.5.
+`syntax` is the object's complete source. Any `$PBExportHeader$` /
+`$PBExportComments$` lines it carries are **ignored** by ORCA, so a body
+straight out of `pb_library_entry_export` and the full contents of a `.sr*`
+file are both valid input. The object's comment comes from `comments`, never
+from the source text.
 
-### `pb_compile_entry_import_list(items)`
+On success the matching `ws_objects/` file is rewritten through ORCA when the
+project keeps one, so the change is visible to git in both forms.
 
-Batch version. `items` is a list of dicts:
+**Output**: adds `{"synced_files": [...], "sync": "ok"}`.
+
+### `pb_compile_entry_import_list(items, sync_sources="auto")`
+
+Batch version — ORCA compiles the whole list together and reuses parser state.
+`items` is a list of dicts:
 
 ```json
 [
@@ -254,6 +457,11 @@ Batch version. `items` is a list of dicts:
   }
 ]
 ```
+
+All diagnostics land in the single `errors` array; ORCA prefixes each
+`message_text` with the object name as `"<entry>:<text>"`. The batch either
+compiles or does not, so the projection is synced for every item only when the
+whole batch succeeds.
 
 ### `pb_application_rebuild(rebuild_type="incremental")`
 
@@ -392,6 +600,13 @@ one of `"incremental"` (default), `"full"`, `"migrate"`, `"3pass"`. Returns
 `{"ok", "rebuild_type"}`; compile diagnostics surface through
 `pb_get_last_compile_errors`.
 
+Two things to expect. It operates on the whole tree at once, so a single
+malformed file fails the batch with no per-object diagnostic — for one object,
+`pb_object_import_file` is both quieter and better at reporting errors. And it
+writes a flat `.sr*` export plus a `.pbg` registry file into `local_proj_path`
+as a side effect, which shows up as untracked noise in a git repo. Check
+`git status` after running it.
+
 ### `pb_scc_exclude_library_list(lib_names)`
 
 Exclude specific PBLs (by name) from SCC management for the current target,
@@ -417,9 +632,11 @@ Close the SCC connection. No-op when not connected. Returns `{"ok": true}`.
 `PB_ORCA_MCP_*` codes (from the server wrapper):
 
 | Name | Meaning |
-|---|---|
+| --- | --- |
 | `PB_ORCA_MCP_INVALIDARGS` | Caller-supplied argument failed validation |
-| `PB_ORCA_MCP_STATEERROR` | Operation requires (or forbids) an open session |
+| `PB_ORCA_MCP_STATEERROR` | Operation requires (or forbids) an open session, or the session configuration would corrupt the transfer |
+| `PB_ORCA_MCP_IOERROR` | A source file could not be read or a directory could not be created |
+| `PB_ORCA_MCP_WORKSPACEERROR` | The workspace layout around a `.pbl` could not be resolved |
 | `PB_ORCA_MCP_VERSIONNOTFOUND` | No PB install with the requested `pb_version` |
 | `PB_ORCA_MCP_VERSIONAMBIGUOUS` | Multiple installs share a major: pass `install_path` |
 | `PB_ORCA_MCP_INSTALLNOTFOUND` | `install_path` didn't match a discovered install |

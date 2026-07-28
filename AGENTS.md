@@ -23,12 +23,25 @@ an agentic workflow.
 ## Architectural constraints
 
 - **This is a Python repo that talks *to* PowerBuilder via the DLL: no
-  PowerBuilder syntax lives here.**
-- **Pure ORCA: never write `.sr*` files to disk.** The server works in-memory →
-  `.pbl`. Writing the source-of-truth file (the `$PBExportHeader$` header +
-  encoding/BOM + CRLF) is the caller's job (see `docs/usage.md` Recipe 1.5);
-  this repo is independent of any external tool for that step.
-- **No PowerGen / OrcaScript / `.gen` files**: legacy batch workflow, out of scope.
+  PowerBuilder syntax lives here.** Nothing parses, formats or validates
+  PowerScript. If a change would require understanding the language, it belongs
+  in another tool.
+- **ORCA writes the `.sr*` files, never us.** The server does put source files
+  on disk, but only through `PBORCA_ConfigureSession` +
+  `PBORCA_LibraryEntryExportEx` in write-to-file mode, so the bytes come from
+  the same engine the IDE uses. Do not hand-assemble an export header, a BOM,
+  or CRLF line endings anywhere in this codebase.
+- **The two forms move together.** Any tool that writes to a `.pbl` must also
+  update the `ws_objects/` projection when the project has one. That is the
+  single guarantee the design exists to provide; adding a mutating tool without
+  a `sync_sources` path is a bug.
+- **No git subprocess.** Git presence is detected from the filesystem
+  (`workspace.find_git_root`). The server never runs `git`, so it works where
+  git is not installed and cannot hang on a prompt.
+- **No OrcaScript / batch-build workflow**: legacy batch/release path, out of scope.
+- **No dependency on sibling projects.** Runtime dependencies are `mcp`,
+  `pydantic`, `click`. Installing from the GitHub repo has to be the whole
+  story.
 
 ## Gotchas
 
@@ -56,19 +69,41 @@ an agentic workflow.
   half the bytes and abort with `C0114 "Error scanning object source entry"`.
   Regression sentinel: `test_compile_entry_import_happy_path_application` in
   `tests/test_session_real.py`. Same for `compile_entry_import_list`.
-- **PB export (`.sra`/`.srf`/`.srw`/…)** = UTF-16 LE + BOM + CRLF + first line
-  `$PBExportHeader$<name>.<ext>`. Marked binary in `.gitattributes`.
-- **Export/import asymmetry**: `library_entry_export` returns **only the body**;
-  `compile_entry_import` **requires** the header. No direct round-trip without
-  re-attaching it. See `docs/usage.md` Recipe 1.
+- **The export header is NOT required on import.** ORCA ignores
+  `$PBExportHeader$` / `$PBExportComments$` lines in `syntax` — body-only,
+  header+body and whole-file-from-disk all import cleanly (verified on PB 22.0,
+  update and create; pinned by `test_import_accepts_body_header_and_whole_file`).
+  Earlier docs in this repo claimed the header was mandatory; that was a
+  misdiagnosis of the `lSrcSize` bug above, which produces the same `C0114`.
+  `library_entry_export` returns the body without those lines because they
+  belong to the file format, not to the object.
+- **PB export files (`.sra`/`.srf`/`.srw`/…)** = BOM + `$PBExportHeader$` +
+  optional `$PBExportComments$` + body, CRLF throughout, in the encoding the
+  `.pbw` `DefaultExportEncode` declares. Marked binary in `.gitattributes` so
+  the fixtures survive round-tripping.
+- **Never translate newlines when reading a `.sr*`.** Importing LF-normalized
+  text succeeds and rewrites every line in the `.pbl`, producing a whole-file
+  phantom diff on the next export. `workspace.read_source_file` reads bytes and
+  decodes; do not replace it with `Path.read_text`.
+- **`eExportEncoding` poisons the in-memory path too.** Set to UTF-8, ORCA packs
+  UTF-8 bytes into the wide buffer and the decoded string is mojibake that then
+  imports "successfully" and destroys the object. `Session._require_buffer_export_config`
+  is the guard; keep it in front of every buffer export/import.
+- **`eClobber` = `PBORCA_CLOBBER (1)` is the only value that overwrites.** The
+  other three, including `CLOBBER_ALWAYS`, return `PBORCA_OBJEXISTS (-8)`.
+- **The export directory must exist** — ORCA does not create it and returns
+  `PBORCA_OBJEXISTS (-8)`.
 - **Empty-PBL bootstrap catch-22**: `SessionSetCurrentAppl` rejects a
   non-existent app_name (`PBORCA_OBJNOTFOUND -3`), but `CompileEntryImport`
   requires current_app set even to import the FIRST application. No in-API way
-  to create the initial app → pre-built PBL fixture
-  (`tests/fixtures/tiny_app/genapp.pbl`).
+  to create the initial app → pre-built PBL fixtures
+  (`tests/fixtures/tiny_app/`, `tests/fixtures/ws_app/`).
 - **`compile_entry_import` is not atomic**: on error ORCA still writes the
   source (possibly truncated) into the `.pbl` → a failed import can corrupt the
   entry. If you need atomicity, snapshot the bytes pre-call and restore on failure.
+- **`pb_scc_refresh_target` has side effects**: it writes a flat `.sr*` export
+  plus a `.pbg` into `local_proj_path`. Documented, not a bug, but it is why
+  the per-object import loop is the recommended path.
 
 ## Design notes (why these choices)
 
@@ -90,8 +125,28 @@ an agentic workflow.
   it with `CompileEntryImport` + a new `lpszComments`. (`PBORCA_LibraryCommentModify`
   exists, but edits the PBL's own comment.)
 
+### Workspace detection
+
+- **`workspace.py` must stay ORCA-free.** It is pure filesystem logic so it can
+  be unit-tested on any machine, including CI with no PowerBuilder. Keep it
+  that way.
+- **The projection mirrors the library's relative path**:
+  `<root>/src/app.pbl` → `<root>/ws_objects/src/app.pbl.src/`. Older workspaces
+  keep one flat tree, so an existing `<lib>.pbl.src` found anywhere under
+  `ws_objects/` wins over the computed path.
+- **Encoding resolution order**: `.pbw` `DefaultExportEncode` → BOM sniffed off
+  an existing `.sr*` → UTF-8. A declared value that disagrees with the files on
+  disk is reported in `observed_encoding` rather than silently reconciled: the
+  IDE will write what the `.pbw` says.
+- **Whether the `.pbl` is tracked in git is the project's policy**, not ours.
+  Both "commit the binary alongside the text" and "treat the binary as a build
+  artifact" occur in the wild; the test workspace used during development is
+  the second kind. Never assume either in code or docs.
+
 ## References
 
 - Contributor guide (human, AI-free): [`CONTRIBUTING.md`](CONTRIBUTING.md).
+- The model and the verified ORCA behaviour: [`docs/how-it-works.md`](docs/how-it-works.md).
+- Contract for downstream tools: [`docs/integrating.md`](docs/integrating.md).
 - ORCA Programmers Guide R3: <https://docs.appeon.com/pb2022r3/orca_guide>
 - ORCA C header (canonical ABI): `<install>\SDK\ORCA\pborca.h`.
