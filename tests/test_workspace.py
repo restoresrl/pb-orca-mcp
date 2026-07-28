@@ -18,7 +18,7 @@ _MAGIC = "Save Format v3.0(19990112)\n"
 
 
 def _pbw(directory: Path, name: str = "proj", encode: str | None = "UTF-8") -> Path:
-    body = _MAGIC + "@begin Targets\n 0 \"app.pbt\";\n@end;\nDefaultTarget \"app.pbt\";\n"
+    body = _MAGIC + '@begin Targets\n 0 "app.pbt";\n@end;\nDefaultTarget "app.pbt";\n'
     if encode is not None:
         body += f'DefaultExportEncode "{encode}";\n'
     path = directory / f"{name}.pbw"

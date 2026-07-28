@@ -163,9 +163,7 @@ def test_in_memory_export_refuses_a_corrupting_configuration(tmp_path: Path) -> 
     try:
         session.configure(export_encoding="utf8")
         with pytest.raises(SessionStateError, match="corrupt"):
-            session.library_entry_export(
-                str(project / "genapp.pbl"), "w_genapp_main", "window"
-            )
+            session.library_entry_export(str(project / "genapp.pbl"), "w_genapp_main", "window")
     finally:
         session.close()
 
@@ -363,9 +361,7 @@ def test_compile_errors_do_not_sync_the_projection(tmp_path: Path) -> None:
     if session is None:
         return
     try:
-        broken = projection.read_bytes().replace(
-            _TITLE_MARKER, b"string title = no_such_variable"
-        )
+        broken = projection.read_bytes().replace(_TITLE_MARKER, b"string title = no_such_variable")
         projection.write_bytes(broken)
         result = source_tools.pb_object_import_file(str(projection), lib)
         assert not result["success"]

@@ -154,9 +154,7 @@ ENTRY_TYPE_EXTENSIONS: dict[str, str] = {
 }
 
 
-ENTRY_TYPE_BY_EXTENSION: dict[str, str] = {
-    ext: name for name, ext in ENTRY_TYPE_EXTENSIONS.items()
-}
+ENTRY_TYPE_BY_EXTENSION: dict[str, str] = {ext: name for name, ext in ENTRY_TYPE_EXTENSIONS.items()}
 """Reverse of `ENTRY_TYPE_EXTENSIONS`: `"srw"` → `"window"`."""
 
 
