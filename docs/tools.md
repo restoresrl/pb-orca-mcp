@@ -574,7 +574,7 @@ projects where `ws_objects/` is the source of truth and the `.pbl` is
 derived. Offline mode reconciles add/modify/delete from `ws_objects/` into
 the binary library without contacting a remote SCC provider. The usual call
 order is `pb_scc_connect_offline` → `pb_scc_set_target` →
-`pb_scc_refresh_target` → `pb_scc_close`; see [`usage.md`](usage.md) for the
+`pb_scc_refresh_target` → `pb_scc_close`; see [`recipes.md`](recipes.md) for the
 full sequence and the git/svn caveats. Online connect, get-latest-version,
 and revision operations are not exposed (they need a live MSSCCI provider).
 

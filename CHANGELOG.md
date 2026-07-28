@@ -40,17 +40,28 @@ dogfooding. Everything below is the content of the first release.
   change is never half-applied. `sync_sources="never"` opts out.
 - `pb_session_configure` (`PBORCA_ConfigureSession`): export encoding, export
   headers, write-to-file mode, import encoding, debug directive.
+- **`pb-orca-mcp check <target>`**: point it at a `.pbw`, `.pbt` or `.pbl` and
+  it runs the whole stack against that project — target parsing, workspace
+  detection, install selection, DLL load, session, library read, and a real
+  ORCA source export whose bytes it verifies. No MCP client involved, and
+  nothing in the project is written, so it answers "does this work on *my*
+  project" before any of it is wired to an assistant, and isolates the layer at
+  fault when something breaks.
 - `pb-orca-mcp doctor` diagnostic command.
 - Two optional cross-agent skills (`pb-orca`, `pb-workflow`) in
   [`skills/`](skills/), written to the [Agent Skills](https://agentskills.io)
   `SKILL.md` standard, plus [`AGENTS.md`](AGENTS.md) agent instructions in the
   cross-tool [agents.md](https://agents.md) standard.
-- Documentation: [`docs/how-it-works.md`](docs/how-it-works.md) (the model
-  everything derives from), [`docs/setup.md`](docs/setup.md) (install and
-  per-client registration), [`docs/usage.md`](docs/usage.md) (recipes),
-  [`docs/tools.md`](docs/tools.md) (tool reference, kept in sync with the
-  registry by a CI guard), and [`docs/integrating.md`](docs/integrating.md)
-  (the contract for tools built on top of this one).
+- Documentation, organized as a reading path rather than a pile: the README is
+  a front door and an index, and each document under `docs/` has one job —
+  [`getting-started.md`](docs/getting-started.md) (install to first compiled
+  change), [`how-it-works.md`](docs/how-it-works.md) (the model everything
+  derives from), [`recipes.md`](docs/recipes.md) (call sequences),
+  [`tools.md`](docs/tools.md) (reference, kept in sync with the registry by a
+  CI guard), [`troubleshooting.md`](docs/troubleshooting.md) (symptom → cause →
+  fix, gathered in one place), and
+  [`integrating.md`](docs/integrating.md) (the contract for tools built on top
+  of this one).
 
 ### Corrected
 

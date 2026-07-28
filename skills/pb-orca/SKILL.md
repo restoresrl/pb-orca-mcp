@@ -121,4 +121,4 @@ is the engine; that one is the source-of-truth discipline.
 ## Reference
 
 Full tool schemas: `docs/tools.md`. The model everything derives from:
-`docs/how-it-works.md`. Recipes: `docs/usage.md`.
+`docs/how-it-works.md`. Recipes: `docs/recipes.md`.

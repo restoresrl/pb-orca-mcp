@@ -44,7 +44,9 @@ pb-orca-mcp = "pb_orca_mcp.__main__:cli"
 
 [project.urls]
 Homepage = "https://github.com/restoresrl/pb-orca-mcp"
+Documentation = "https://github.com/restoresrl/pb-orca-mcp/blob/main/docs/getting-started.md"
 Issues = "https://github.com/restoresrl/pb-orca-mcp/issues"
+Changelog = "https://github.com/restoresrl/pb-orca-mcp/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pb_orca_mcp"]

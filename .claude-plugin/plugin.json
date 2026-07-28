@@ -8,6 +8,6 @@
   "_note": [
     "This manifest is only the Claude Code packaging of a client-neutral project, and one optional install channel among several.",
     "The skills under skills/ are agentskills-standard SKILL.md files any skill-aware agent can load, and docs/ is the cross-client source of truth.",
-    "Nothing here is required: registering the server with any MCP client is a standard mcpServers block. See docs/setup.md."
+    "Nothing here is required: registering the server with any MCP client is a standard mcpServers block. See docs/getting-started.md."
   ]
 }

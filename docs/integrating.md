@@ -6,7 +6,7 @@ contract you can rely on, the invariants you must not break, and the things
 this server deliberately leaves to you.
 
 If you are driving the server directly rather than wrapping it, read
-[`usage.md`](usage.md) instead. If you want to know *why* the design is shaped
+[`recipes.md`](recipes.md) instead. If you want to know *why* the design is shaped
 this way, read [`how-it-works.md`](how-it-works.md).
 
 ---
@@ -32,7 +32,7 @@ projection from drifting apart.
 - A PowerScript parser, formatter, or linter. It moves source bytes; it never
   interprets them. Any syntax knowledge in your tool stays in your tool.
 - A release build runner. Batch/OrcaScript pipelines keep their job (see the
-  anti-recipe in [`usage.md`](usage.md)).
+  anti-recipe in [`recipes.md`](recipes.md)).
 - A git client. It reports whether git is watching; it never runs git.
 - An orchestrator. It has no notion of a task, a plan, or a retry policy.
 

@@ -52,7 +52,7 @@ an agentic workflow.
   found and marked `tested: false`. ORCA ABI stable since PB 2019.
 - **IDE vs runtime**: discovery filters out runtime-only installs (no `pborc.dll`).
 - **x86 vs x64**: Python must run in the same arch as the loaded DLL (see
-  `docs/setup.md`).
+  `docs/troubleshooting.md`).
 - **Windows paths**: `/` is accepted on input and normalized internally with `Path`.
 
 ### ORCA / ctypes

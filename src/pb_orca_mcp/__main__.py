@@ -6,6 +6,7 @@ Invoked by the `pb-orca-mcp` console script (see pyproject.toml [project.scripts
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 import click
 
@@ -28,6 +29,35 @@ def serve() -> None:
     from pb_orca_mcp.server import run_stdio
 
     run_stdio()
+
+
+@cli.command()
+@click.argument("target", type=click.Path())
+@click.option("--pb-version", default=None, help='PowerBuilder version to use, e.g. "22.0".')
+@click.option("--install-path", default=None, help="Exact PB install directory to use.")
+def check(target: str, pb_version: str | None, install_path: str | None) -> None:
+    """Verify pb-orca works against YOUR project. TARGET is a .pbw, .pbt or .pbl.
+
+    `doctor` tells you PowerBuilder is installed and ORCA loads. This tells you
+    the thing you actually want to know: that the whole stack works on the
+    project in front of you. It parses the target, detects the workspace
+    layout, opens a real ORCA session, reads the library, and exports one
+    object to a temporary directory to confirm the bytes come out right.
+
+    Nothing in the project is modified. It deliberately stops short of the
+    compile path, which needs the current application set, and ORCA can rewrite
+    the .pbw as a side effect of that.
+    """
+    from pb_orca_mcp.check import CheckError, format_failure, format_report, preamble, run_check
+
+    click.echo(preamble())
+    try:
+        report = run_check(target, pb_version=pb_version, install_path=install_path)
+    except CheckError as exc:
+        click.echo("")
+        click.echo(format_failure(exc), err=True)
+        sys.exit(1)
+    click.echo(format_report(report, Path(target).name))
 
 
 @cli.command()

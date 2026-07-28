@@ -4,7 +4,7 @@ Wraps `pb_orca_mcp.orca.session.Session.scc_*` methods with JSON-friendly
 input/output. Errors come back as `{"error": {"code","name","message"}}`.
 
 The primary use case is the offline-mode "Refresh PBL" flow described in
-`docs/usage.md`: on git-managed PB projects, `ws_objects/` is the
+`docs/how-it-works.md`: on git-managed PB projects, `ws_objects/` is the
 source of truth and the `.pbl` is derived. The sequence
 
     pb_scc_get_connect_properties → pb_scc_connect_offline →

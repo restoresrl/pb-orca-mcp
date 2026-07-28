@@ -15,6 +15,27 @@ Everything stated here about ORCA's behaviour was verified against a real
 PowerBuilder 22.0 workspace. Where something is inferred from the
 specification rather than observed, it says so.
 
+## The short version
+
+If you read nothing else:
+
+- A PowerBuilder object can exist in **two** places: the binary `.pbl`, and —
+  only on workspaces put under source control in the IDE — a text file under
+  `ws_objects/`. When both exist, **the text file is the source of truth** and
+  the `.pbl` is rebuilt from it.
+- **ORCA only ever touches the `.pbl`.** A headless import updates the binary
+  and nothing else. Left there, the text file still holds the old source, and
+  the next Refresh or merge silently reverts your change.
+- pb-orca closes that gap: every tool that writes to a `.pbl` also rewrites the
+  matching text file, in the same call, and tells you which files it touched.
+- **Never hand-write a `.sr*` file.** Let `pb_object_export_file` produce it —
+  ORCA writes the header, the encoding and the CRLF line endings exactly as the
+  IDE does. Do not let an editor normalize line endings either.
+- `pb_workspace_info` tells you which shape a project is in, before you write.
+
+The rest of this document is why each of those is true, and what happens when
+one is ignored.
+
 ---
 
 ## 1. The two representations of an object
@@ -547,7 +568,7 @@ identically rests on the PowerBuilder specification for the `.pbw`
 tell you whether a file is tracked — run `git status` yourself. It does not
 format PowerScript. It is not a release build runner: batch and OrcaScript
 pipelines stay where they are (see the anti-recipe in
-[`usage.md`](usage.md)).
+[`recipes.md`](recipes.md)).
 
 ---
 

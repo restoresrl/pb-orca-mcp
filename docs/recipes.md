@@ -1,14 +1,15 @@
-# Usage guide
+# Recipes
 
-Concrete tool-call sequences for driving PowerBuilder with `pb-orca-mcp`.
-These are the patterns an MCP agent follows when given a task like "fix the
-compile error in `n_cst_main`".
+Concrete tool-call sequences for driving PowerBuilder with `pb-orca-mcp` —
+the patterns an assistant follows when given a task like "fix the compile error
+in `n_cst_main`". Useful to read if you want to know what your assistant is
+doing, and to copy from if you are scripting against the tools yourself.
 
 Read [`how-it-works.md`](how-it-works.md) first if you have not: it explains
 the `.pbl` / `ws_objects/` model these recipes assume, and the one silent
 failure mode worth understanding before your first write. For the full schema
-of every tool see [`tools.md`](tools.md); for install and MCP-client
-registration see [`setup.md`](setup.md).
+of every tool see [`tools.md`](tools.md); to install and connect a client, see
+[`getting-started.md`](getting-started.md).
 
 ---
 
