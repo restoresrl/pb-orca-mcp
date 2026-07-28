@@ -26,6 +26,7 @@ from pb_orca_mcp.tools import library as library_tools
 from pb_orca_mcp.tools import query as query_tools
 from pb_orca_mcp.tools import scc as scc_tools
 from pb_orca_mcp.tools import session as session_tools
+from pb_orca_mcp.tools import source as source_tools
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -38,11 +39,17 @@ _TOOLS: tuple[tuple[Callable[..., object], str], ...] = (
     # Discovery
     (discovery_tools.pb_discover_pb_install, "pb_discover_pb_install"),
     (discovery_tools.pb_target_info, "pb_target_info"),
+    (source_tools.pb_workspace_info, "pb_workspace_info"),
     # Session
     (session_tools.pb_session_open, "pb_session_open"),
     (session_tools.pb_session_close, "pb_session_close"),
     (session_tools.pb_set_current_application, "pb_set_current_application"),
     (session_tools.pb_set_library_list, "pb_set_library_list"),
+    (source_tools.pb_session_configure, "pb_session_configure"),
+    # Source files — the export → edit → import loop
+    (source_tools.pb_object_export_file, "pb_object_export_file"),
+    (source_tools.pb_object_import_file, "pb_object_import_file"),
+    (source_tools.pb_library_export_sources, "pb_library_export_sources"),
     # Library
     (library_tools.pb_library_create, "pb_library_create"),
     (library_tools.pb_library_delete, "pb_library_delete"),

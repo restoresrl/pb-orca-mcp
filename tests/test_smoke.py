@@ -51,21 +51,25 @@ def test_cli_doctor_runs_to_completion() -> None:
 
 
 def test_server_exposes_all_tools() -> None:
-    """Every PLAN tool is wired through to the MCP server.
+    """Every tool is wired through to the MCP server.
 
-    Current count: 23 core tools + 6 SCC offline-mode tools = 29.
-    Bump the expected count when adding/removing a tool.
+    Current count: 23 ORCA tools + 6 SCC offline-mode tools + 5 workspace /
+    source-file tools = 34. Bump it when adding or removing a tool; the
+    matching entry in `docs/tools.md` is enforced by `test_docs_in_sync`.
     """
     from pb_orca_mcp.server import tool_names
 
     names = tool_names()
-    assert len(names) == 29
+    assert len(names) == 34
     # Anchor a few names so a rename or accidental drop fails loudly.
     assert "pb_discover_pb_install" in names
     assert "pb_compile_entry_import" in names
     assert "pb_application_rebuild" in names
     assert "pb_executable_create" in names
     assert "pb_object_query_hierarchy" in names
+    assert "pb_workspace_info" in names
+    assert "pb_object_export_file" in names
+    assert "pb_object_import_file" in names
     assert "pb_scc_connect_offline" in names
     assert "pb_scc_refresh_target" in names
 

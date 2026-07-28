@@ -62,6 +62,11 @@ class PbwInfo:
     workspace_name: str = ""
     targets: list[str] = field(default_factory=list)
     default_target: str = ""
+    default_export_encode: str = ""
+    """`DefaultExportEncode` — the encoding the IDE writes `ws_objects/` files
+    in (`UTF-8`, `UTF-16BOM`, `ANSI`). Empty when the directive is absent, in
+    which case UTF-8 is assumed. Writing a source file in any other encoding
+    makes the IDE mis-read it on the next Refresh."""
 
 
 class PbProjectParseError(ValueError):
@@ -156,6 +161,7 @@ def parse_pbw_text(text: str, workspace_name: str = "") -> PbwInfo:
         workspace_name=workspace_name,
         targets=blocks.get("Targets", []),
         default_target=directives.get("defaulttarget", ""),
+        default_export_encode=directives.get("defaultexportencode", ""),
     )
 
 

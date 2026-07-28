@@ -88,6 +88,7 @@ def test_parse_pbw_targets_block() -> None:
         workspace_name="myws",
         targets=["src\\main.pbt", "src\\tools.pbt"],
         default_target="src\\main.pbt",
+        default_export_encode="UTF-8",
     )
 
 
