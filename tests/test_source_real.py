@@ -95,6 +95,7 @@ def test_export_to_file_is_byte_identical_to_the_ide_output(tmp_path: Path) -> N
             ("m_genapp_main", "menu", "m_genapp_main.srm"),
             ("genapp", "application", "genapp.sra"),
             ("w_genapp_about", "window", "w_genapp_about.srw"),
+            ("d_genapp_dw_test", "datawindow", "d_genapp_dw_test.srd"),
         ):
             path, size = session.library_entry_export_to_file(
                 str(lib), entry_name, entry_type, str(out), encoding="utf8"
@@ -296,6 +297,36 @@ def test_pbl_only_project_round_trip(tmp_path: Path) -> None:
         assert result["sync"] == "not_applicable"
         assert result["synced_files"] == []
         assert "Standalone" in session.library_entry_export(lib, "w_genapp_main", "window")
+    finally:
+        session.close()
+
+
+@pytest.mark.requires_pb
+def test_datawindow_round_trips_through_a_file(tmp_path: Path) -> None:
+    """DataWindows are the object kind that can carry a binary part, so they
+    get their own round trip rather than riding on the window cases.
+
+    The fixture's DataWindow is plain text (no `Start of PowerBuilder Binary
+    Data Section` block), so this pins the `.srd` extension mapping and the
+    round trip; a DataWindow with an embedded picture or OLE object would be
+    needed to exercise `bExportIncludeBinary` itself.
+    """
+    project = _ws_app(tmp_path)
+    lib = str(project / "genapp.pbl")
+    projection = project / "ws_objects" / "genapp.pbl.src" / "d_genapp_dw_test.srd"
+    session = _open_session_or_skip(project / "genapp.pbl")
+    if session is None:
+        return
+    try:
+        exported = source_tools.pb_object_export_file(lib, "d_genapp_dw_test", "datawindow")
+        assert Path(exported["file_path"]) == projection
+        first = projection.read_bytes()
+
+        result = source_tools.pb_object_import_file(str(projection), lib)
+        assert result["entry_type"] == "datawindow"
+        assert result["success"], result["errors"]
+        assert result["synced_files"] == [str(projection)]
+        assert projection.read_bytes() == first, "the round trip must be byte-stable"
     finally:
         session.close()
 

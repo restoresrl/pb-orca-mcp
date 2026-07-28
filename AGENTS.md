@@ -104,6 +104,10 @@ an agentic workflow.
 - **`pb_scc_refresh_target` has side effects**: it writes a flat `.sr*` export
   plus a `.pbg` into `local_proj_path`. Documented, not a bug, but it is why
   the per-object import loop is the recommended path.
+- **`bExportIncludeBinary` is set on every file export** and DataWindows
+  round-trip byte-identically, but the fixture's `.srd` is plain text. The
+  binary-block path (a DataWindow embedding a picture or OLE object) is still
+  unproven; see `docs/how-it-works.md` §9.
 
 ## Design notes (why these choices)
 

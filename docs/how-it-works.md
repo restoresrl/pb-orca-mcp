@@ -253,8 +253,8 @@ match `DefaultExportEncode`, or whose line endings or BOM are wrong, causes a
 confusing Refresh failure in the IDE later. Letting ORCA write the file removes
 that entire class of bug, because the engine that defines the bytes is the one
 producing them. Byte-identity was verified against the IDE's own `ws_objects/`
-output for a window, a menu and an application object; objects with a binary
-part are the one caveat (section 9).
+output for a window, a menu, an application object and a DataWindow; objects
+carrying an actual binary block are the one caveat (section 9).
 
 ---
 
@@ -486,11 +486,14 @@ Two other files to watch:
 
 ## 9. Limits and open questions
 
-**DataWindows and other objects with a binary part (`.srd`).** Objects that
-carry a binary component need `bExportIncludeBinary` on the export so the
-binary block is written; pb-orca sets it for every file export. The objects
-exercised end to end so far (window, menu, application) have no binary part, so
-this path is specified and enabled but not yet verified byte-for-byte.
+**Objects with a binary part.** DataWindows can carry a binary block (an
+embedded picture, an OLE object), which needs `bExportIncludeBinary` on the
+export or the block is dropped from the file. pb-orca sets it for every file
+export. A DataWindow *does* round-trip byte-identically today — that is
+covered by a test — but the one in the fixture is plain text, with no
+`Start of PowerBuilder Binary Data Section` block, so the binary path itself
+is enabled and specified rather than proven. An object that actually carries
+one would settle it.
 
 **`.pbg` registration**, as described in section 8.
 
