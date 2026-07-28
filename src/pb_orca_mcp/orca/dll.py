@@ -17,9 +17,9 @@ Unicode (`LPTSTR` resolves to `wchar_t*` when `UNICODE` is defined, which
 is the modern default — the header keeps an ANSI shim `PBORCA_SessionOpenA`
 that we do not use).
 
-Phase 3 deliverable: session prototypes (Open/Close/SetCurrentAppl/
-SetLibraryList/GetError). Library / compile / build prototypes land in
-phases 4-6.
+The prototypes are grouped the way `PBORCA.H` groups them: session, library,
+compile, build + object query, SCC. `OrcaApi` holds one bound-function
+dataclass per group.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any
 
 from pb_orca_mcp.orca.types import (
     PBORCA_COMPERR,
+    PBORCA_CONFIG_SESSION,
     PBORCA_DIRENTRY,
     PBORCA_ENTRYINFO,
     PBORCA_EXEINFO,
@@ -121,6 +122,10 @@ class SessionFns:
     """`INT PBORCA_SessionSetLibraryList(HPBORCA, LPTSTR*, INT NumberOfLibs)`."""
     SessionGetError: Any
     """`void PBORCA_SessionGetError(HPBORCA, LPTSTR Buffer, INT BufferSize)`."""
+    ConfigureSession: Any
+    """`INT PBORCA_ConfigureSession(HPBORCA, PPBORCA_CONFIG_SESSION)` — export
+    encoding, export headers, write-to-file mode and its target directory.
+    See `PBORCA_CONFIG_SESSION` for the per-field semantics."""
 
 
 @dataclass(frozen=True)
@@ -272,12 +277,17 @@ def _bind_session_fns(dll: ctypes.WinDLL) -> SessionFns:
     get_error.argtypes = [c_void_p, c_wchar_p, c_int]
     get_error.restype = None
 
+    configure = dll.PBORCA_ConfigureSession
+    configure.argtypes = [c_void_p, POINTER(PBORCA_CONFIG_SESSION)]
+    configure.restype = c_int
+
     return SessionFns(
         SessionOpen=session_open,
         SessionClose=session_close,
         SessionSetCurrentAppl=set_current_appl,
         SessionSetLibraryList=set_lib_list,
         SessionGetError=get_error,
+        ConfigureSession=configure,
     )
 
 

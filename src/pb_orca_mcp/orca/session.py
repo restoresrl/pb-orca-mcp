@@ -36,22 +36,32 @@ from typing import TYPE_CHECKING, Any
 
 from pb_orca_mcp.orca.constants import (
     PBORCA_BUFFERTOOSMALL,
+    PBORCA_CLOBBER,
     PBORCA_COMPERROR,
     PBORCA_LINKERROR,
     PBORCA_MSGBUFFER,
     PBORCA_OK,
     build_flags_from_names,
     compile_level_to_name,
+    encoding_from_name,
     entry_type_from_name,
     entry_type_to_name,
+    extension_for_entry_type,
     rebuild_type_from_name,
     reftype_to_name,
     scc_refresh_flags_from_names,
 )
 from pb_orca_mcp.orca.errors import OrcaError
-from pb_orca_mcp.orca.types import PBORCA_ENTRYINFO, PBORCA_EXEINFO, PBORCA_SCC
+from pb_orca_mcp.orca.types import (
+    PBORCA_CONFIG_SESSION,
+    PBORCA_ENTRYINFO,
+    PBORCA_EXEINFO,
+    PBORCA_SCC,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from pb_orca_mcp.discovery import PbInstall
     from pb_orca_mcp.orca.dll import OrcaApi
 
@@ -91,6 +101,10 @@ class _State:
     scc_callback_refs: list[Any] = field(default_factory=list)
     """Callback refs scoped to the SCC connect → close lifetime (separate from
     per-call `callback_refs` so they can be cleared together on `scc_close`)."""
+    config: dict[str, Any] | None = None
+    """Last configuration passed to `PBORCA_ConfigureSession`, or `None` while
+    the session still runs on ORCA's defaults. Lets `configured_for_files`
+    restore what the caller had set."""
 
 
 class Session:
@@ -218,6 +232,87 @@ class Session:
         state.api.session.SessionGetError(state.handle, buf, PBORCA_MSGBUFFER)
         return buf.value
 
+    # --------------------------- session config ---------------------------
+
+    def configure(
+        self,
+        *,
+        export_encoding: str = "unicode",
+        export_headers: bool = False,
+        export_include_binary: bool = False,
+        export_to_file: bool = False,
+        export_directory: str | None = None,
+        import_encoding: str = "unicode",
+        debug: bool = False,
+        clobber: int = PBORCA_CLOBBER,
+    ) -> dict[str, Any]:
+        """`PBORCA_ConfigureSession(handle, &PBORCA_CONFIG_SESSION)`.
+
+        Replaces the whole session configuration; every field defaults to the
+        ORCA default, so calling it with no arguments resets the session. The
+        returned dict is the configuration that was applied, and it is stored
+        on the session state so `configured_for_files` can restore it.
+
+        Raises `ValueError` for an unknown encoding name and when
+        `export_to_file` is set without an `export_directory`.
+        """
+        state = self._require_open("configure")
+        if export_to_file and not export_directory:
+            raise ValueError("export_to_file requires export_directory")
+        cfg = PBORCA_CONFIG_SESSION()
+        cfg.eClobber = clobber
+        cfg.eExportEncoding = encoding_from_name(export_encoding)
+        cfg.bExportHeaders = 1 if export_headers else 0
+        cfg.bExportIncludeBinary = 1 if export_include_binary else 0
+        cfg.bExportCreateFile = 1 if export_to_file else 0
+        cfg.pExportDirectory = export_directory
+        cfg.eImportEncoding = encoding_from_name(import_encoding)
+        cfg.bDebug = 1 if debug else 0
+        rc = state.api.session.ConfigureSession(state.handle, pointer(cfg))
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        applied = {
+            "export_encoding": export_encoding,
+            "export_headers": export_headers,
+            "export_include_binary": export_include_binary,
+            "export_to_file": export_to_file,
+            "export_directory": export_directory,
+            "import_encoding": import_encoding,
+            "debug": debug,
+        }
+        state.config = applied
+        return applied
+
+    @contextlib.contextmanager
+    def configured_for_files(
+        self, directory: str, encoding: str, *, include_binary: bool = True
+    ) -> Iterator[None]:
+        """Put the session in write-to-file export mode for the duration of the block.
+
+        On exit the previous configuration is restored (ORCA's default when
+        `configure` was never called), so buffer exports keep behaving exactly
+        as before — verified reversible on PB 22.0.
+
+        `directory` must exist: ORCA does not create it.
+        """
+        state = self._require_open("configured_for_files")
+        previous = state.config
+        self.configure(
+            export_encoding=encoding,
+            export_headers=True,
+            export_include_binary=include_binary,
+            export_to_file=True,
+            export_directory=directory,
+        )
+        try:
+            yield
+        finally:
+            if previous is None:
+                self.configure()
+                state.config = None
+            else:
+                self.configure(**previous)
+
     # --------------------------- library group ---------------------------
 
     def library_create(self, lib_path: str, comments: str = "") -> None:
@@ -301,12 +396,18 @@ class Session:
         }
 
     def library_entry_export(self, lib_path: str, entry_name: str, entry_type: str) -> str:
-        """`PBORCA_LibraryEntryExportEx` with auto-resizing buffer.
+        """`PBORCA_LibraryEntryExportEx` into a wide buffer, returned as a `str`.
 
         Starts at 64 KiB; if ORCA returns `PBORCA_BUFFERTOOSMALL`, reads the
         required size from `pReturnSize` and retries (max 3 attempts).
+
+        Refuses to run when the session has been configured for file export or
+        for a non-Unicode export encoding: in that state ORCA would pack the
+        source into the wide buffer in that other encoding and the decoded
+        string would be silently mangled rather than failing.
         """
         state = self._require_open("library_entry_export")
+        self._require_buffer_export_config("library_entry_export")
         type_code = entry_type_from_name(entry_type)
         size = _INITIAL_EXPORT_BUFFER
         for _ in range(_MAX_EXPORT_ATTEMPTS):
@@ -322,6 +423,43 @@ class Session:
                 continue
             raise self._build_error(rc)
         raise self._build_error(PBORCA_BUFFERTOOSMALL)
+
+    def library_entry_export_to_file(
+        self,
+        lib_path: str,
+        entry_name: str,
+        entry_type: str,
+        directory: str,
+        *,
+        encoding: str = "utf8",
+        include_binary: bool = True,
+    ) -> tuple[str, int]:
+        """Have ORCA write the entry's source as a `.sr*` file in `directory`.
+
+        This is `PBORCA_LibraryEntryExportEx` running under a session
+        configured with `bExportCreateFile`, so the bytes on disk — export
+        header, `$PBExportComments$`, BOM, CRLF — are produced by the same
+        engine the PB IDE uses. Verified byte-identical to the IDE's own
+        `ws_objects/` output on PB 22.0.
+
+        ORCA names the file `<entry_name>.<ext>` itself; the returned path is
+        that name resolved against `directory`. `directory` must exist.
+
+        Returns `(file_path, bytes_written)`. `bytes_written` is ORCA's
+        payload count, which excludes the BOM.
+        """
+        state = self._require_open("library_entry_export_to_file")
+        type_code = entry_type_from_name(entry_type)
+        extension = extension_for_entry_type(entry_type)
+        target = os.path.join(directory, f"{entry_name}.{extension}")
+        return_size = c_long(0)
+        with self.configured_for_files(directory, encoding, include_binary=include_binary):
+            rc = state.api.library.LibraryEntryExportEx(
+                state.handle, lib_path, entry_name, type_code, None, 0, pointer(return_size)
+            )
+        if rc != PBORCA_OK:
+            raise self._build_error(rc)
+        return target, int(return_size.value)
 
     def library_entry_delete(self, lib_path: str, entry_name: str, entry_type: str) -> None:
         """`PBORCA_LibraryEntryDelete(handle, lib, entry, type)`."""
@@ -365,12 +503,23 @@ class Session:
     ) -> tuple[bool, list[dict[str, Any]]]:
         """`PBORCA_CompileEntryImport(handle, lib, entry, type, comments, syntax, len, cb, NULL)`.
 
+        `syntax` is the object's complete source. Any `$PBExportHeader$` /
+        `$PBExportComments$` lines it happens to carry are ignored by ORCA, so
+        a body straight out of `library_entry_export` and the full contents of
+        an on-disk `.sr*` file are both valid input (both verified on PB 22.0).
+        The stored comment comes from `comments`, never from the source.
+
+        `lSrcSize` is a **byte** count, and ctypes hands ORCA UTF-16, so it is
+        `len(syntax) * 2`. Passing the character count makes ORCA read half the
+        source and abort with `C0114`.
+
         Returns `(success, errors)` where `success` is `rc == PBORCA_OK`
         (i.e. no compile errors). On `PBORCA_COMPERROR (-11)` returns
         `(False, errors)` with the diagnostics from the callback. Other
         negative codes raise `OrcaError`.
         """
         state = self._require_open("compile_entry_import")
+        self._require_buffer_export_config("compile_entry_import")
         type_code = entry_type_from_name(entry_type)
         callback, errors = self._make_errproc(state)
         try:
@@ -398,6 +547,7 @@ class Session:
         `entry_type` (string), `syntax`. Optional: `comments`.
         """
         state = self._require_open("compile_entry_import_list")
+        self._require_buffer_export_config("compile_entry_import_list")
         if not items:
             raise ValueError("items must contain at least one entry")
         n = len(items)
@@ -780,6 +930,31 @@ class Session:
             state.scc_callback_refs.clear()
         if rc != PBORCA_OK:
             raise self._build_error(rc)
+
+    def _require_buffer_export_config(self, op: str) -> None:
+        """Guard the in-memory export/import path against a hostile session config.
+
+        Both directions cross the C ABI as UTF-16 (ctypes marshals `str` that
+        way), so `eExportEncoding` / `eImportEncoding` must be `unicode` and
+        write-to-file mode must be off. Getting this wrong does not raise in
+        ORCA — it silently mangles the text — so it is checked here.
+        """
+        config = self._state.config if self._state is not None else None
+        if config is None:
+            return  # ORCA defaults: buffer mode, Unicode both ways
+        problems = []
+        if config.get("export_to_file"):
+            problems.append("export_to_file is on")
+        if config.get("export_encoding", "unicode") != "unicode":
+            problems.append(f"export_encoding is {config['export_encoding']!r}")
+        if config.get("import_encoding", "unicode") != "unicode":
+            problems.append(f"import_encoding is {config['import_encoding']!r}")
+        if problems:
+            raise SessionStateError(
+                f"Cannot {op}: the session configuration would corrupt the transfer "
+                f"({', '.join(problems)}). Reset it with pb_session_configure, or use the "
+                f"file-based tools which manage the configuration themselves."
+            )
 
     def _require_scc_connected(self, op: str) -> _State:
         state = self._require_open(op)

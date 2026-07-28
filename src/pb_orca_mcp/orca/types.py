@@ -149,6 +149,55 @@ class PBORCA_SETTARGET(Structure):
     ]
 
 
+class PBORCA_CONFIG_SESSION(Structure):
+    """Session-wide options for `PBORCA_ConfigureSession`.
+
+    This is the struct that turns ORCA's source export from "fill a wide
+    buffer" into "write a `.sr*` file to disk", which is how pb-orca produces
+    text sources without ever formatting a byte itself.
+
+    Field notes, all verified against a real PB 22.0 workspace:
+
+    - `eClobber`: only `PBORCA_CLOBBER` overwrites an existing file; the other
+      three values return `PBORCA_OBJEXISTS (-8)`.
+    - `eExportEncoding`: affects the **buffer** path too, not just files. With
+      `PBORCA_UTF8` set, `LibraryEntryExportEx` packs UTF-8 bytes into the
+      wide buffer and the returned Python string is mojibake. Keep it at
+      `PBORCA_UNICODE` for every buffer export.
+    - `bExportHeaders`: prepends `$PBExportHeader$<entry>.<ext>` and, when the
+      object carries a comment, `$PBExportComments$<comment>`.
+    - `bExportIncludeBinary`: required for objects with a binary part
+      (DataWindows) or that part is dropped from the exported source.
+    - `bExportCreateFile` + `pExportDirectory`: write-to-file mode. **The
+      directory must already exist** — ORCA does not create it and returns
+      `PBORCA_OBJEXISTS (-8)` if it is missing.
+    - `eImportEncoding`: describes the bytes behind the `syntax` pointer of
+      `CompileEntryImport`. ctypes always marshals `str` as UTF-16, so this
+      must stay `PBORCA_UNICODE`; anything else makes the import fail with
+      `C0114`.
+    - `bDebug`: compile with the debug directive (also settable via
+      `PBORCA_SetDebug`).
+
+    The call replaces the whole configuration, so a zeroed struct restores the
+    defaults, and the effect is reversible: switching to file mode and back
+    leaves buffer exports byte-for-byte as they were.
+    """
+
+    _fields_ = [
+        ("eClobber", c_int),
+        ("eExportEncoding", c_int),
+        ("bExportHeaders", c_int),
+        ("bExportIncludeBinary", c_int),
+        ("bExportCreateFile", c_int),
+        ("pExportDirectory", c_wchar_p),
+        ("eImportEncoding", c_int),
+        ("bDebug", c_int),
+        ("filler2", c_void_p),
+        ("filler3", c_void_p),
+        ("filler4", c_void_p),
+    ]
+
+
 class PBORCA_EXEINFO(Structure):
     """Optional version-info struct for `PBORCA_SetExeInfo` before `ExecutableCreate`.
 

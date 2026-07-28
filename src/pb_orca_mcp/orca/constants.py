@@ -154,13 +154,32 @@ ENTRY_TYPE_EXTENSIONS: dict[str, str] = {
 }
 
 
+ENTRY_TYPE_BY_EXTENSION: dict[str, str] = {
+    ext: name for name, ext in ENTRY_TYPE_EXTENSIONS.items()
+}
+"""Reverse of `ENTRY_TYPE_EXTENSIONS`: `"srw"` → `"window"`."""
+
+
+def entry_type_for_extension(extension: str) -> str:
+    """Resolve a `.sr*` file extension (with or without the dot) to an entry type name."""
+    key = extension.lower().lstrip(".")
+    try:
+        return ENTRY_TYPE_BY_EXTENSION[key]
+    except KeyError as exc:
+        valid = ", ".join("." + e for e in sorted(ENTRY_TYPE_BY_EXTENSION))
+        raise ValueError(
+            f"{extension!r} is not a PowerBuilder source extension; valid: {valid}"
+        ) from exc
+
+
 def extension_for_entry_type(name: str) -> str:
     """Return the canonical `.sr*` extension for an entry type name.
 
-    Used to construct the `$PBExportHeader$<entry_name>.<ext>` line that
-    `PBORCA_CompileEntryImport` expects. Raises `ValueError` for types
-    that have no on-disk source representation (`project`, `proxyobject`,
-    `binary`).
+    ORCA picks this extension itself when it writes a source file, so the
+    mapping is only needed to *predict* the produced filename and to derive
+    the entry type back from a file the caller hands us. Raises `ValueError`
+    for types that have no on-disk source representation (`project`,
+    `proxyobject`, `binary`).
     """
     try:
         return ENTRY_TYPE_EXTENSIONS[name.lower()]
@@ -170,6 +189,52 @@ def extension_for_entry_type(name: str) -> str:
             f"(only sources types have one: "
             f"{', '.join(sorted(ENTRY_TYPE_EXTENSIONS))})"
         ) from exc
+
+
+# Source encodings (`enum pborca_encoding` in PBORCA.H). Applies to both the
+# export side (`eExportEncoding`) and the import side (`eImportEncoding`) of
+# `PBORCA_CONFIG_SESSION`.
+PBORCA_UNICODE = 0
+PBORCA_UTF8 = 1
+PBORCA_HEXASCII = 2
+PBORCA_ANSI_DBCS = 3
+
+ENCODING_NAMES: dict[int, str] = {
+    PBORCA_UNICODE: "unicode",
+    PBORCA_UTF8: "utf8",
+    PBORCA_HEXASCII: "hexascii",
+    PBORCA_ANSI_DBCS: "ansi",
+}
+
+ENCODING_VALUES: dict[str, int] = {name: value for value, name in ENCODING_NAMES.items()}
+
+
+def encoding_from_name(name: str) -> int:
+    """Resolve an encoding name to its `PBORCA_ENCODING` int."""
+    try:
+        return ENCODING_VALUES[name.lower()]
+    except KeyError as exc:
+        valid = ", ".join(sorted(ENCODING_VALUES))
+        raise ValueError(f"unknown encoding {name!r}; valid: {valid}") from exc
+
+
+def encoding_to_name(value: int) -> str:
+    """Map a `PBORCA_ENCODING` int to its string name."""
+    return ENCODING_NAMES.get(value, f"unknown({value})")
+
+
+# File-write behaviour when the export target file already exists
+# (`enum pborca_clobber` in PBORCA.H).
+#
+# Verified against PB 22.0: only `PBORCA_CLOBBER` actually overwrites. The
+# other three (including `CLOBBER_ALWAYS`, whose name suggests otherwise) leave
+# the file alone and return `PBORCA_OBJEXISTS (-8)`. Re-exporting over an
+# existing `.sr*` is the normal case for the ws_objects sync, so the session
+# always sends `PBORCA_CLOBBER`.
+PBORCA_NOCLOBBER = 0
+PBORCA_CLOBBER = 1
+PBORCA_CLOBBER_ALWAYS = 2
+PBORCA_CLOBBER_DECIDED_BY_SYSTEM = 3
 
 
 # Rebuild types (`enum pborca_rebuild_type` in PBORCA.H).
