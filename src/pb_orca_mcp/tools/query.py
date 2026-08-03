@@ -26,7 +26,12 @@ from pb_orca_mcp.orca.session import Session, SessionStateError
 
 
 def pb_object_query_hierarchy(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
-    """Walk the ancestor chain of a single entry."""
+    """Walk the ancestor chain of a single entry.
+
+    An object that derives straight from a built-in class (`window`,
+    `nonvisualobject`, ...) has no ancestors ORCA will report, and that comes
+    back as `PBORCA_OBJHASNOANCS (-14)`. Treat it as empty, not as a failure.
+    """
     session = Session.instance()
     try:
         ancestors = session.object_query_hierarchy(lib_path, entry_name, entry_type)
@@ -45,7 +50,17 @@ def pb_object_query_hierarchy(lib_path: str, entry_name: str, entry_type: str) -
 
 
 def pb_object_query_reference(lib_path: str, entry_name: str, entry_type: str) -> dict[str, Any]:
-    """List every entry that references the named object."""
+    """List what the named object references — its **outgoing** dependencies.
+
+    Callees, ancestors used, types declared, windows opened. Not the reverse:
+    ORCA exposes no incoming-direction primitive, so "who calls this entry"
+    means inverting the index by querying every candidate caller in the
+    library list.
+
+    An object that references nothing answers in one of two shapes —
+    `{"references": [], "count": 0}`, or `PBORCA_OBJHASNOREFS (-15)`. Both
+    mean empty; neither is a failure.
+    """
     session = Session.instance()
     try:
         refs = session.object_query_reference(lib_path, entry_name, entry_type)
