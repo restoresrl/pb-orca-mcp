@@ -57,8 +57,8 @@ Step 2 opens a real ORCA session against your workspace and reports what it
 found, without writing anything. When it prints `Check OK`, the machinery works
 on your project — before any of it is wired to an assistant.
 
-Then add this to your MCP client's config (`.claude/mcp.json`,
-`.cursor/mcp.json`, …):
+Then add this to your MCP client's config (`.mcp.json` at the project root
+for Claude Code, `.cursor/mcp.json` for Cursor, …):
 
 ```json
 {

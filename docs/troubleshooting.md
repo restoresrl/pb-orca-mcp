@@ -27,6 +27,7 @@ wiring to your assistant.
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
+| The first `uvx` command fails on git: *authentication failed*, *repository not found*, *could not read Username* | This repository is private during internal dogfooding, and `uv` fetches it through `git`. Nothing is wrong with PowerBuilder. | Authenticate `git` to GitHub once — `git clone https://github.com/restoresrl/pb-orca-mcp` and let the credential helper store the result — then retry. If the clone itself is refused, you have not been granted access to the repository. |
 | `doctor`: *No PowerBuilder IDE installation found* | What is installed is the PB **runtime**, not the IDE. Runtime packages do not ship `pborc.dll`. | Install PowerBuilder IDE 2019 R3 or later. `doctor` lists runtime-only installs separately so you can see what it found. |
 | `doctor`: *No PB install is usable from this Python (x64)* | Architecture mismatch. `ctypes` cannot load an x86 DLL from x64 Python, and PB IDE is x86 through 2025. | Use an x86 interpreter: add `--python 3.12-x86` to the `uvx` / `uv tool install` command, and to the `args` in your MCP config. |
 | `doctor` lists the install but says `load failed: …` | The DLL is blocked — antivirus, Defender, or SmartScreen quarantining a file from an unfamiliar publisher. | Whitelist `<install>\IDE\pborc.dll`, or repair the PowerBuilder installation. |
@@ -46,8 +47,8 @@ Work through it in this order; each step rules out a layer.
 2. **Does PowerBuilder work?** `pb-orca-mcp doctor` must exit 0.
 3. **Does your project work?** `pb-orca-mcp check <your .pbw>` must exit 0. If
    steps 1 to 3 pass, everything below the MCP layer is fine.
-4. **Is the config file the right one?** Clients differ:
-   `.claude/mcp.json`, `.cursor/mcp.json`, and so on — see
+4. **Is the config file the right one?** Clients differ: `.mcp.json` at the
+   project root for Claude Code, `.cursor/mcp.json` for Cursor, and so on — see
    [getting-started.md](getting-started.md#4-connect-it-to-your-mcp-client).
    The JSON block itself is identical everywhere.
 5. **Did the client reload?** Most only read the config at startup.

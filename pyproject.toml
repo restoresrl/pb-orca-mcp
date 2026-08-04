@@ -29,6 +29,15 @@ dependencies = [
     "mcp>=1.0",
     "pydantic>=2.0",
     "click>=8.1",
+    # Transitive, reached through mcp -> pyjwt[crypto]. Constrained because
+    # cryptography stopped publishing 32-bit Windows wheels at 49.0, and this
+    # package has to run on an x86 interpreter to load pborc.dll. Without the
+    # ceiling, a fresh `uvx --python 3.12-x86` resolves the newest cryptography,
+    # finds no win32 wheel, tries to build it from source and fails on the Rust
+    # and OpenSSL toolchain — which made the documented install command
+    # unusable on any machine without a warm cache. Revisit if upstream ships
+    # win32 wheels again, or if mcp drops the pyjwt[crypto] dependency.
+    "cryptography<49",
 ]
 
 [project.optional-dependencies]

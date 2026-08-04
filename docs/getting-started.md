@@ -34,6 +34,14 @@ you if you got it wrong.
 **`uv`.** The [Astral installer](https://docs.astral.sh/uv/) — it fetches
 Python and runs the server without you managing an environment.
 
+**Access to this repository.** It is private during internal dogfooding, so
+every `git+https://github.com/restoresrl/pb-orca-mcp` below is an
+authenticated fetch. `uv` shells out to `git`, so it uses whatever credential
+helper `git` already uses: if you can `git clone` this repository, `uvx` can
+fetch it. If you have never authenticated to GitHub on this machine, step 2
+fails with a git authentication error rather than anything about
+PowerBuilder — clone once, let the credential helper store the result, retry.
+
 **Close the PowerBuilder IDE** before step 3. It holds exclusive locks on open
 `.pbl` files and ORCA respects them.
 
@@ -163,7 +171,7 @@ differs:
 
 | Client | Where the block goes |
 | --- | --- |
-| Claude Code | `.claude/mcp.json` (project) or `~/.claude/mcp.json` (user) |
+| Claude Code | `.mcp.json` at the project root — shared and committable. For a user-wide or machine-local entry, `claude mcp add` writes it for you. |
 | Cursor | `.cursor/mcp.json` (project) or `~/.cursor/mcp.json` (user) |
 | Codex CLI, Gemini CLI, Copilot, others | that client's MCP config file |
 

@@ -65,6 +65,22 @@ dogfooding. Everything below is the content of the first release.
 
 ### Corrected
 
+- **The documented install command did not work on a clean machine.**
+  `cryptography` — reached transitively through `mcp` → `pyjwt[crypto]` —
+  stopped publishing 32-bit Windows wheels at 49.0, and this package must run
+  on an x86 interpreter to load `pborc.dll`. So `uvx --python 3.12-x86`
+  resolved the newest cryptography, found no win32 wheel, tried to build it
+  from source, and failed on the Rust and OpenSSL toolchain. It only appeared
+  to work where an environment had been built earlier, against a version that
+  still had wheels. Constrained to `cryptography<49`; revisit if upstream
+  ships win32 wheels again, or if `mcp` drops the `pyjwt[crypto]` dependency.
+- The tool description of `pb_object_query_reference` stated the opposite of
+  what it does — "list every entry that references the named object" — while
+  the implementation, the ORCA callback and `docs/tools.md` all correctly
+  described the outgoing direction. The docstring is what a model reads as the
+  tool's description, so it was the copy that mattered. Both query tools now
+  also state that "nothing to report" arrives as `PBORCA_OBJHASNOANCS (-14)`
+  or `PBORCA_OBJHASNOREFS (-15)`, which mean empty rather than broken.
 - Earlier drafts of the documentation stated that
   `PBORCA_CompileEntryImport` **requires** a `$PBExportHeader$` line as the
   first line of the source. It does not: ORCA ignores that line and
