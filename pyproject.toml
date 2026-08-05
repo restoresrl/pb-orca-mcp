@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pb-orca-mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "MCP server exposing PowerBuilder's ORCA API (pborc.dll) as MCP tools — usable from any MCP client"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-05
+
+### Corrected
+
+- `--version` reported `0.1.0` from a 0.2.0 install. `__version__` was a
+  hardcoded string that the release bump missed; it now derives from the
+  installed distribution's metadata, so it cannot drift from `pyproject.toml`
+  again. Found by pinning an install to `@v0.2.0` and reading what it printed,
+  which is the whole reason to pin.
+
 ## [0.2.0] - 2026-08-05
 
 Nothing is published to PyPI yet. These tags exist so a team can pin a known
