@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No stable version has been published yet; the project is in internal
-dogfooding. Everything below is the content of the first release.
+## [0.2.0] - 2026-08-05
+
+Nothing is published to PyPI yet. These tags exist so a team can pin a known
+version instead of following the default branch, which is what an unpinned
+`git+https://...` install does. `v0.1.0` was cut on 2026-05-13 and never
+released anywhere, so this entry consolidates everything up to here.
+
+**Breaking**: `pb_edit_and_import` was removed. The edit loop is
+`pb_object_export_file` -> edit the file -> `pb_object_import_file`, which also
+updates the text projection in the same call. Callers that used the old helper
+have to move; there is no shim.
 
 ### Added
 
