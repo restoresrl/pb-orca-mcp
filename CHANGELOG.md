@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-08-05
+
+### Corrected
+
+- **The server would not start.** `mcp` 2.0.0 removed `mcp.server.fastmcp`,
+  which this server is built on, and the dependency had no upper bound — so
+  any install resolving fresh got 2.x and died at startup on
+  `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Pinned to
+  `mcp>=1.0,<2`; lift the ceiling together with a port to the 2.x server API.
+
+  Two things hid this. `doctor` and `check` never import the MCP layer, so
+  the CLI kept working and looked like proof the package was fine. And the
+  test suite only read the tool *registry*, a plain tuple, never calling
+  `build_server()` — the one function that imports FastMCP. 196 tests were
+  green against a build that could not serve a single request. There is now
+  a test that builds the real server and counts its registered tools, so a
+  resolution the server cannot run on fails in CI rather than in an editor.
+
 ## [0.2.1] - 2026-08-05
 
 ### Corrected

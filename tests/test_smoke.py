@@ -74,6 +74,26 @@ def test_server_exposes_all_tools() -> None:
     assert "pb_scc_refresh_target" in names
 
 
+def test_server_actually_builds() -> None:
+    """`build_server()` constructs the real FastMCP server and registers all 34.
+
+    `test_server_exposes_all_tools` only reads the registry tuple, which needs
+    no MCP import at all — so the whole suite passed green against an `mcp`
+    release that had dropped `mcp.server.fastmcp`, and the failure surfaced
+    only when a client started the server over stdio. `doctor` and `check`
+    do not import it either, which is why the CLI looked healthy. This test
+    performs the import and the registration, so a resolution the server
+    cannot run on fails here instead of in a user's editor.
+    """
+    import asyncio
+
+    from pb_orca_mcp.server import build_server
+
+    tools = asyncio.run(build_server().list_tools())
+    assert len(tools) == 34
+    assert "pb_workspace_info" in {t.name for t in tools}
+
+
 def test_discovery_is_importable_and_returns_tuple() -> None:
     """Phase 2: `discover_pb_installations()` is callable everywhere.
 

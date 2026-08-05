@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pb-orca-mcp"
-version = "0.2.1"
+version = "0.2.2"
 description = "MCP server exposing PowerBuilder's ORCA API (pborc.dll) as MCP tools — usable from any MCP client"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -26,7 +26,14 @@ classifiers = [
     "Topic :: Software Development :: Build Tools",
 ]
 dependencies = [
-    "mcp>=1.0",
+    # Ceiling because `mcp` 2.0.0 removed `mcp.server.fastmcp`, which this
+    # server is built on. Without it a fresh resolve picks up 2.x and the
+    # process dies at startup on `ModuleNotFoundError: No module named
+    # 'mcp.server.fastmcp'` — only in stdio serve mode, since `doctor` and
+    # `check` never import it. Lift the ceiling together with a port to the
+    # 2.x server API; a floating major on the transport layer is what broke
+    # this, so re-pin rather than re-open the range.
+    "mcp>=1.0,<2",
     "pydantic>=2.0",
     "click>=8.1",
     # Transitive, reached through mcp -> pyjwt[crypto]. Constrained because
