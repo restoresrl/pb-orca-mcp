@@ -119,8 +119,19 @@ class WorkspaceInfo:
     tree differ by exactly the bytes ORCA writes: a change can land in the
     `.pbl` and its projection while `git status` stays clean, and the drift is
     invisible until someone else checks the tree out. Fix it with a
-    `*.sr* binary` rule plus `git add --renormalize`, in its own commit,
-    *before* any write loop."""
+    `*.sr* -text` rule plus `git add --renormalize`, in its own commit,
+    *before* any write loop.
+
+    Use `-text`, not `binary`. Both stop the translation, but `binary` also
+    implies `-diff`, so git answers "Binary files differ" instead of showing
+    the change — which throws away the reason the text projection exists.
+    `binary` is right for `*.pbl` and `*.pbd`, which really are opaque."""
+    sources_diffable: bool
+    """`False` when a `.gitattributes` rule marks the `.sr*` files `binary` or
+    `-diff`. Protected but unreviewable: git answers "Binary files differ", so
+    a change to a PowerBuilder object cannot be read in a diff or a pull
+    request, which is the whole point of keeping a text projection. Replace
+    `binary` with `-text` on the sources; keep `binary` for `*.pbl`/`*.pbd`."""
     work_dir: str
     """`<root>/.pb-orca` — where working files go when there is no projection."""
 
@@ -158,9 +169,22 @@ class WorkspaceInfo:
                 "line-ending translation, so git rewrites them on checkout and the "
                 "index disagrees with the working tree by exactly the bytes ORCA "
                 "writes. A change can land while `git status` stays clean, and the "
-                "drift only surfaces on someone else's checkout. Add `*.sr* binary` "
-                "(plus *.pbl, *.pbd) and run `git add --renormalize` in its own "
-                "commit before any write loop. "
+                "drift only surfaces on someone else's checkout. Add `*.sr* -text` "
+                "(and `*.pbl`, `*.pbd` as `binary`), then run `git add --renormalize` "
+                "in its own commit, before any write loop. Use `-text` rather than "
+                "`binary` for the sources: both stop the translation, but `binary` "
+                "also suppresses the diff, which is the reason the projection exists. "
+                + self._layout_advice
+            )
+        if not self.sources_diffable:
+            return (
+                "WARNING: a .gitattributes rule marks the .sr* files `binary` (or "
+                "`-diff`), so git reports \"Binary files differ\" instead of showing "
+                "what changed. The bytes are safe, but a PowerBuilder change cannot "
+                "be read in a diff or a pull request — which is what the text "
+                "projection is for. Use `-text` on the sources instead: it stops the "
+                "line-ending translation just as well and leaves the diff readable. "
+                "Keep `binary` for *.pbl and *.pbd. "
                 + self._layout_advice
             )
         return self._layout_advice
@@ -324,6 +348,7 @@ def describe(lib_path: str | os.PathLike[str]) -> WorkspaceInfo:
         export_encode, encoding_source = DEFAULT_EXPORT_ENCODE, "default"
 
     git_root = find_git_root(lib)
+    protection, diffable = line_ending_protection(lib, git_root)
 
     return WorkspaceInfo(
         root=str(root),
@@ -336,7 +361,8 @@ def describe(lib_path: str | os.PathLike[str]) -> WorkspaceInfo:
         encoding_source=encoding_source,
         observed_encoding=observed,
         git_root=git_root,
-        source_protection=line_ending_protection(lib, git_root),
+        source_protection=protection,
+        sources_diffable=diffable,
         work_dir=str(root / WORK_DIRNAME),
     )
 
@@ -493,6 +519,25 @@ def _attribute_protects(value: str) -> bool | None:
     return settled
 
 
+def _attribute_suppresses_diff(value: str) -> bool | None:
+    """Does this attribute list turn the diff off, on, or say nothing?
+
+    `binary` is the trap. It is a macro for `-diff -merge -text`, so the rule
+    most often recommended for PowerBuilder sources protects the bytes *and*
+    makes git answer "Binary files differ" — throwing away the reviewable diff
+    that is the entire reason a project keeps a text projection. `-text` stops
+    the translation and leaves the diff alone, which is what these files want.
+    """
+    settled: bool | None = None
+    for token in value.split():
+        lowered = token.lower()
+        if lowered in ("binary", "-diff"):
+            settled = True
+        elif lowered == "diff" or lowered.startswith("diff="):
+            settled = False
+    return settled
+
+
 def _matches(pattern: str, filename: str) -> bool:
     """Match a `.gitattributes` pattern against a bare filename.
 
@@ -511,16 +556,19 @@ def _matches(pattern: str, filename: str) -> bool:
 
 def line_ending_protection(
     start: str | os.PathLike[str], git_root: str | None
-) -> str:
+) -> tuple[str, bool]:
     """Are the `.sr*` files exempt from git's line-ending translation?
 
     Walks the `.gitattributes` files from the git root down to `start`, the way
     git resolves attributes: a deeper file wins over a shallower one, and
     within a file the last matching line wins. Returns `protected` only when
     every `.sr*` extension ends up exempted or pinned.
+
+    Returns `(protection, sources_diffable)`. The second value is `False` when
+    a rule marks the sources `binary` or `-diff`: protected, but unreviewable.
     """
     if git_root is None:
-        return PROTECTION_NO_GIT
+        return PROTECTION_NO_GIT, True
 
     root = Path(git_root)
     start_dir = Path(start)
@@ -537,6 +585,7 @@ def line_ending_protection(
         pass
 
     verdict = dict.fromkeys(_SOURCE_FILENAME_SAMPLES, None)  # type: dict[str, bool | None]
+    nodiff = dict.fromkeys(_SOURCE_FILENAME_SAMPLES, None)  # type: dict[str, bool | None]
     for directory in chain:
         attributes = directory / ".gitattributes"
         if not attributes.is_file():
@@ -553,12 +602,18 @@ def line_ending_protection(
             if not rest.strip():
                 continue
             settled = _attribute_protects(rest)
-            if settled is None:
+            suppressed = _attribute_suppresses_diff(rest)
+            if settled is None and suppressed is None:
                 continue
             for sample in _SOURCE_FILENAME_SAMPLES:
-                if _matches(pattern, sample):
+                if not _matches(pattern, sample):
+                    continue
+                if settled is not None:
                     verdict[sample] = settled
+                if suppressed is not None:
+                    nodiff[sample] = suppressed
 
+    diffable = not any(nodiff.values())
     if all(verdict.values()):
-        return PROTECTION_PROTECTED
-    return PROTECTION_UNPROTECTED
+        return PROTECTION_PROTECTED, diffable
+    return PROTECTION_UNPROTECTED, diffable

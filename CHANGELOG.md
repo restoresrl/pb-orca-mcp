@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-08-09
+
+### Corrected
+
+- **v0.2.3 recommended the wrong rule.** It told callers to fix an unprotected
+  workspace with `*.sr* binary`. That does stop the line-ending translation —
+  and `binary` is a macro for `-diff -merge -text`, so git then answers
+  `Binary files differ` for every change to a PowerBuilder object. It trades a
+  silent-drift problem for an unreadable-diff one, and discards the reason a
+  project keeps a text projection at all. The advice now says `*.sr* -text`,
+  with `binary` kept for `*.pbl` and `*.pbd`, which really are opaque.
+
+  Caught within hours, by an apply loop that followed the advice literally: it
+  wrote the rule, renormalized, and the next `git diff` said `Binary files
+  differ`.
+
+### Added
+
+- `pb_workspace_info` also reports **`sources_diffable`**, because *protected*
+  and *reviewable* turn out to be different questions and the common advice
+  answers the first by breaking the second. It is `false` when a rule marks
+  the `.sr*` files `binary` or `-diff` — a state that reports as `protected`
+  and would otherwise say nothing, which is how the mistake above survives in
+  a repository once someone makes it. `advice` explains the swap.
+
 ## [0.2.3] - 2026-08-09
 
 ### Added

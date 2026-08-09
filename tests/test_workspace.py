@@ -291,12 +291,12 @@ def _git_repo(tmp_path: Path, attributes: str | None = None) -> Path:
 
 
 def test_protection_reports_no_git_outside_a_working_tree(tmp_path: Path) -> None:
-    assert ws.line_ending_protection(tmp_path, None) == ws.PROTECTION_NO_GIT
+    assert ws.line_ending_protection(tmp_path, None)[0] == ws.PROTECTION_NO_GIT
 
 
 def test_protection_unprotected_without_gitattributes(tmp_path: Path) -> None:
     root = _git_repo(tmp_path)
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_UNPROTECTED
 
 
 @pytest.mark.parametrize(
@@ -312,7 +312,7 @@ def test_protection_unprotected_without_gitattributes(tmp_path: Path) -> None:
 )
 def test_protection_recognizes_every_way_of_exempting_sources(tmp_path: Path, rule: str) -> None:
     root = _git_repo(tmp_path, rule)
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_PROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_PROTECTED
 
 
 def test_text_auto_alone_is_not_protection(tmp_path: Path) -> None:
@@ -322,7 +322,7 @@ def test_text_auto_alone_is_not_protection(tmp_path: Path) -> None:
     translation rather than exempting anything from it.
     """
     root = _git_repo(tmp_path, "* text=auto eol=lf\n")
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_UNPROTECTED
 
 
 def test_eol_lf_is_not_protection(tmp_path: Path) -> None:
@@ -333,19 +333,19 @@ def test_eol_lf_is_not_protection(tmp_path: Path) -> None:
     is the same policy pointed the safe way.
     """
     root = _git_repo(tmp_path / "lf", "*.sr* text eol=lf\n")
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_UNPROTECTED
 
     root2 = _git_repo(tmp_path / "crlf", "*.sr* text eol=crlf\n")
-    assert ws.line_ending_protection(root2, str(root2)) == ws.PROTECTION_PROTECTED
+    assert ws.line_ending_protection(root2, str(root2))[0] == ws.PROTECTION_PROTECTED
 
 
 def test_last_matching_line_wins(tmp_path: Path) -> None:
     """git resolves attributes with the last match, so a later rule can undo."""
     root = _git_repo(tmp_path, "*.sr* binary\n* text=auto\n")
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_UNPROTECTED
 
     root2 = _git_repo(tmp_path / "b", "* text=auto\n*.sr* binary\n")
-    assert ws.line_ending_protection(root2, str(root2)) == ws.PROTECTION_PROTECTED
+    assert ws.line_ending_protection(root2, str(root2))[0] == ws.PROTECTION_PROTECTED
 
 
 def test_partial_coverage_is_not_protection(tmp_path: Path) -> None:
@@ -355,12 +355,12 @@ def test_partial_coverage_is_not_protection(tmp_path: Path) -> None:
     are still translated are exactly the ones nobody will think to check.
     """
     root = _git_repo(tmp_path, "*.srw binary\n*.sru binary\n")
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_UNPROTECTED
 
 
 def test_comments_and_blank_lines_are_ignored(tmp_path: Path) -> None:
     root = _git_repo(tmp_path, "# keep PB sources byte-exact\n\n*.sr* binary\n")
-    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_PROTECTED
+    assert ws.line_ending_protection(root, str(root))[0] == ws.PROTECTION_PROTECTED
 
 
 def test_deeper_gitattributes_overrides_the_root(tmp_path: Path) -> None:
@@ -368,7 +368,41 @@ def test_deeper_gitattributes_overrides_the_root(tmp_path: Path) -> None:
     deep = root / "ws_objects" / "app.pbl.src"
     deep.mkdir(parents=True)
     (deep / ".gitattributes").write_text("*.sr* binary\n", encoding="utf-8")
-    assert ws.line_ending_protection(deep, str(root)) == ws.PROTECTION_PROTECTED
+    assert ws.line_ending_protection(deep, str(root))[0] == ws.PROTECTION_PROTECTED
+
+
+def test_binary_protects_the_bytes_but_kills_the_diff(tmp_path: Path) -> None:
+    """The rule most often recommended for PB sources, and its cost.
+
+    `binary` is a macro for `-diff -merge -text`. The bytes are safe, and git
+    then answers "Binary files differ" for every change to a PowerBuilder
+    object — discarding the reviewable diff the text projection exists to
+    provide. Protected, and unreviewable, are two separate facts.
+    """
+    root = _git_repo(tmp_path / "bin", "*.sr* binary\n")
+    protection, diffable = ws.line_ending_protection(root, str(root))
+    assert protection == ws.PROTECTION_PROTECTED
+    assert diffable is False
+
+    root2 = _git_repo(tmp_path / "notext", "*.sr* -text\n")
+    protection2, diffable2 = ws.line_ending_protection(root2, str(root2))
+    assert protection2 == ws.PROTECTION_PROTECTED
+    assert diffable2 is True
+
+
+def test_describe_warns_when_sources_are_protected_but_undiffable(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path, "*.sr* binary\n")
+    _pbw(root)
+    lib = root / "app.pbl"
+    lib.write_bytes(b"")
+    _source_file(root / ws.WS_OBJECTS_DIRNAME / "app.pbl.src", "w_main.srw")
+
+    info = ws.describe(lib)
+    assert info.source_protection == ws.PROTECTION_PROTECTED
+    assert info.sources_diffable is False
+    assert "Binary files differ" in info.advice
+    assert "-text" in info.advice
+    assert info.to_dict()["sources_diffable"] is False
 
 
 def test_describe_surfaces_protection_and_warns_in_advice(tmp_path: Path) -> None:
@@ -386,7 +420,10 @@ def test_describe_surfaces_protection_and_warns_in_advice(tmp_path: Path) -> Non
     assert "Text projection present" in info.advice
     assert info.to_dict()["source_protection"] == ws.PROTECTION_UNPROTECTED
 
-    (root / ".gitattributes").write_text("*.sr* binary\n", encoding="utf-8")
+    # `-text`, not `binary`: both stop the translation, but `binary` implies
+    # `-diff` and would trade one warning for the other.
+    (root / ".gitattributes").write_text("*.sr* -text\n", encoding="utf-8")
     clean = ws.describe(lib)
     assert clean.source_protection == ws.PROTECTION_PROTECTED
+    assert clean.sources_diffable is True
     assert "WARNING" not in clean.advice

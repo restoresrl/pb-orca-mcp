@@ -109,6 +109,7 @@ unfamiliar project.
   "observed_encoding": "utf8",
   "git_root": "C:\\proj",
   "source_protection": "protected",
+  "sources_diffable": true,
   "work_dir": "C:\\proj\\.pb-orca",
   "outside_source_tree": false,
   "advice": "Text projection present: ..."
@@ -131,12 +132,20 @@ unfamiliar project.
   CRLF, so the index and the working tree differ by exactly the bytes ORCA
   writes -- a change can land in the `.pbl` and its projection while
   `git status` stays clean, and nobody sees the drift until a fresh checkout.
-  The fix is a `*.sr* binary` rule (plus `*.pbl`, `*.pbd`) followed by
-  `git add --renormalize`, in its own commit, because it rewrites every source
-  in the index. Note that `eol=lf` counts as unprotected: it is a deliberate
+  The fix is a `*.sr* -text` rule (with `*.pbl`, `*.pbd` as `binary`) followed
+  by `git add --renormalize`, in its own commit, because it rewrites every
+  source in the index. Note that `eol=lf` counts as unprotected: it is a deliberate
   policy pointed the wrong way, since ORCA writes CRLF. This answers whether
   the protection *exists*; to measure what the index already holds, run
   `git ls-files --eol`.
+- `sources_diffable`: `false` when a rule marks the `.sr*` files `binary` or
+  `-diff`. **Protected and unreviewable are different problems, and `binary`
+  causes the second while fixing the first.** `binary` is a macro for
+  `-diff -merge -text`, so git answers "Binary files differ" and a change to a
+  PowerBuilder object cannot be read in a diff or a pull request — which is the
+  reason a project keeps a text projection at all. Use `-text` on the sources:
+  it stops the line-ending translation just as well and leaves the diff alone.
+  Keep `binary` for `*.pbl` and `*.pbd`, which really are opaque.
 - `outside_source_tree`: the workspace keeps a projection, but this library has
   no directory under it. That combination is what a **vendored dependency
   snapshot or a third-party component** looks like — a library that lives
