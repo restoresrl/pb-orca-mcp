@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-08-09
+
+### Corrected
+
+- The `bytes` field of `pb_object_export_file` and
+  `pb_library_export_sources` is the size of the source text ORCA produced,
+  not the size of the file on disk — a workspace with a byte-order mark writes
+  that mark on top, so the file is larger by its length. Nothing said so, and
+  a caller checking that two exports agree by comparing `bytes` against the
+  file size gets a mismatch on every entry. Documented in the tool description
+  and in `docs/tools.md`; the field itself is unchanged, since callers depend
+  on it.
+
 ## [0.2.4] - 2026-08-09
 
 ### Corrected

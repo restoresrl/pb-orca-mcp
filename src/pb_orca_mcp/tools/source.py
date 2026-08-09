@@ -85,6 +85,12 @@ def pb_object_export_file(
     ORCA writes the file itself, in the workspace's declared encoding and with
     the export headers, so it is byte-identical to the PB IDE's own output.
 
+    `bytes` is the size of the source text ORCA produced, **not** the size of
+    the file on disk: a workspace whose encoding carries a byte-order mark
+    writes that mark in addition, so the file is larger by its length (3 for
+    UTF-8). Comparing `bytes` against the file size therefore reports a
+    mismatch on every entry. To check two exports agree, compare the files.
+
     The destination is detected unless `dest_dir` says otherwise: the library's
     `ws_objects/<lib>.pbl.src/` directory when the project keeps a text
     projection (the file *is* the source of truth there, so it is refreshed in

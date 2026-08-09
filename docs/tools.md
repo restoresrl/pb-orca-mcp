@@ -264,7 +264,7 @@ self-ignoring `.gitignore`; the repository's own `.gitignore` is never touched.
   "entry_type": "window",
   "encoding": "utf8",
   "export_encode": "UTF-8",
-  "bytes": 713,
+  "bytes": 713,        // source text only; a BOM adds to the file, not to this
   "mode": "ws_objects",
   "is_source_of_truth": true
 }
