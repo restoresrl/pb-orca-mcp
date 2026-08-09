@@ -108,6 +108,7 @@ unfamiliar project.
   "encoding_source": "pbw",
   "observed_encoding": "utf8",
   "git_root": "C:\\proj",
+  "source_protection": "protected",
   "work_dir": "C:\\proj\\.pb-orca",
   "outside_source_tree": false,
   "advice": "Text projection present: ..."
@@ -122,6 +123,20 @@ unfamiliar project.
   already inconsistent: the IDE will rewrite those files on its next export.
 - `sources.source_dir` is populated even when `exists` is false, so a bootstrap
   knows where to write.
+- `source_protection`: `protected` when a `.gitattributes` rule exempts the
+  `.sr*` files from git's line-ending translation (`binary`, `-text`,
+  `text=false`, or `eol=crlf`), `unprotected` when nothing does, `no_git`
+  outside a working tree. **Check this before any edit loop.** Unprotected is
+  the quiet failure: git stores the sources with LF and checks them out with
+  CRLF, so the index and the working tree differ by exactly the bytes ORCA
+  writes -- a change can land in the `.pbl` and its projection while
+  `git status` stays clean, and nobody sees the drift until a fresh checkout.
+  The fix is a `*.sr* binary` rule (plus `*.pbl`, `*.pbd`) followed by
+  `git add --renormalize`, in its own commit, because it rewrites every source
+  in the index. Note that `eol=lf` counts as unprotected: it is a deliberate
+  policy pointed the wrong way, since ORCA writes CRLF. This answers whether
+  the protection *exists*; to measure what the index already holds, run
+  `git ls-files --eol`.
 - `outside_source_tree`: the workspace keeps a projection, but this library has
   no directory under it. That combination is what a **vendored dependency
   snapshot or a third-party component** looks like — a library that lives

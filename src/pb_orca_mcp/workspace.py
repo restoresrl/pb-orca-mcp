@@ -109,6 +109,18 @@ class WorkspaceInfo:
     inconsistent and the IDE will rewrite those files on its next export."""
     git_root: str | None
     """Root of the git working tree containing the library, or `None`."""
+    source_protection: str
+    """`protected` when a `.gitattributes` rule exempts the `.sr*` files from
+    git's line-ending translation, `unprotected` when nothing does, `no_git`
+    when the library is not in a git working tree.
+
+    `unprotected` is the dangerous value and the quiet one. git stores the
+    sources with LF and checks them out with CRLF, so the index and the working
+    tree differ by exactly the bytes ORCA writes: a change can land in the
+    `.pbl` and its projection while `git status` stays clean, and the drift is
+    invisible until someone else checks the tree out. Fix it with a
+    `*.sr* binary` rule plus `git add --renormalize`, in its own commit,
+    *before* any write loop."""
     work_dir: str
     """`<root>/.pb-orca` — where working files go when there is no projection."""
 
@@ -140,6 +152,22 @@ class WorkspaceInfo:
     @property
     def advice(self) -> str:
         """One line telling a caller what this layout implies for its next write."""
+        if self.source_protection == PROTECTION_UNPROTECTED:
+            return (
+                "WARNING: no .gitattributes rule exempts the .sr* files from git's "
+                "line-ending translation, so git rewrites them on checkout and the "
+                "index disagrees with the working tree by exactly the bytes ORCA "
+                "writes. A change can land while `git status` stays clean, and the "
+                "drift only surfaces on someone else's checkout. Add `*.sr* binary` "
+                "(plus *.pbl, *.pbd) and run `git add --renormalize` in its own "
+                "commit before any write loop. "
+                + self._layout_advice
+            )
+        return self._layout_advice
+
+    @property
+    def _layout_advice(self) -> str:
+        """What the projection layout alone implies, protection aside."""
         if self.mode == "ws_objects":
             return (
                 "Text projection present: every write to the .pbl must also rewrite the "
@@ -295,6 +323,8 @@ def describe(lib_path: str | os.PathLike[str]) -> WorkspaceInfo:
     else:
         export_encode, encoding_source = DEFAULT_EXPORT_ENCODE, "default"
 
+    git_root = find_git_root(lib)
+
     return WorkspaceInfo(
         root=str(root),
         workspace_file=workspace_file,
@@ -305,7 +335,8 @@ def describe(lib_path: str | os.PathLike[str]) -> WorkspaceInfo:
         orca_encoding=orca_encoding_for(export_encode),
         encoding_source=encoding_source,
         observed_encoding=observed,
-        git_root=find_git_root(lib),
+        git_root=git_root,
+        source_protection=line_ending_protection(lib, git_root),
         work_dir=str(root / WORK_DIRNAME),
     )
 
@@ -402,3 +433,132 @@ def _export_encode_for_orca(orca_name: str) -> str:
     return {"utf8": "UTF-8", "unicode": "UTF-16BOM", "ansi": "ANSI"}.get(
         orca_name, DEFAULT_EXPORT_ENCODE
     )
+
+
+# --- Line-ending protection -------------------------------------------------
+#
+# git's autocrlf translation is the one workspace property that can make a
+# correct write look like a no-op. Without a .gitattributes rule covering the
+# `.sr*` files, git stores them with LF and hands them back with CRLF, so the
+# working tree and the index disagree by exactly the bytes ORCA cares about —
+# and `git status` stays clean while the .pbl and its projection drift apart.
+#
+# This is answered from the filesystem alone, like the rest of this module: it
+# reports whether the *protection* is in place, not whether the index has
+# already been normalized. Measuring that needs `git ls-files --eol`, which
+# means invoking git, which this module deliberately never does.
+
+_SOURCE_FILENAME_SAMPLES = (
+    "object.sra",
+    "object.srd",
+    "object.srf",
+    "object.srm",
+    "object.srq",
+    "object.srs",
+    "object.sru",
+    "object.srw",
+)
+"""One filename per `.sr*` extension, used to evaluate `.gitattributes` patterns
+the way git would: by matching them against real names."""
+
+PROTECTION_PROTECTED = "protected"
+PROTECTION_UNPROTECTED = "unprotected"
+PROTECTION_NO_GIT = "no_git"
+
+
+def _attribute_protects(value: str) -> bool | None:
+    """Does this attribute list settle the line-ending question, and how?
+
+    `True` when the file is exempted from translation (`binary`, `-text`,
+    `text=false`) or checked out with the endings ORCA writes (`eol=crlf`).
+    `False` when translation applies (`text`, `text=auto`). `None` when the
+    line says nothing about it, so an earlier match keeps standing.
+
+    `eol=lf` counts as **not** protected, which is the subtle case. It looks
+    like a deliberate line-ending policy, and it is — just the wrong one here.
+    ORCA writes CRLF, so git would hand the file back as LF on every checkout
+    and the two would disagree forever. `eol=crlf` is the version of that
+    policy that happens to be safe, because the checked-out bytes are the ones
+    PowerBuilder produces.
+    """
+    settled: bool | None = None
+    for token in value.split():
+        lowered = token.lower()
+        if lowered in ("binary", "-text", "text=false"):
+            settled = True
+        elif lowered.startswith("eol="):
+            settled = lowered == "eol=crlf"
+        elif lowered in ("text", "text=auto"):
+            settled = False
+    return settled
+
+
+def _matches(pattern: str, filename: str) -> bool:
+    """Match a `.gitattributes` pattern against a bare filename.
+
+    Only the filename-pattern case is handled — `*.sr*`, `*.srw`, `*` — which
+    is what every rule that could cover PowerBuilder sources looks like. A
+    pattern anchored to a path (`src/**`) is treated as not matching, which
+    errs toward reporting `unprotected`: the wrong answer in that direction
+    costs a redundant warning, the other one costs a corrupted library.
+    """
+    from fnmatch import fnmatch
+
+    if "/" in pattern.strip("/"):
+        return False
+    return fnmatch(filename, pattern.lstrip("/"))
+
+
+def line_ending_protection(
+    start: str | os.PathLike[str], git_root: str | None
+) -> str:
+    """Are the `.sr*` files exempt from git's line-ending translation?
+
+    Walks the `.gitattributes` files from the git root down to `start`, the way
+    git resolves attributes: a deeper file wins over a shallower one, and
+    within a file the last matching line wins. Returns `protected` only when
+    every `.sr*` extension ends up exempted or pinned.
+    """
+    if git_root is None:
+        return PROTECTION_NO_GIT
+
+    root = Path(git_root)
+    start_dir = Path(start)
+    if start_dir.is_file():
+        start_dir = start_dir.parent
+
+    # Root first, then each directory down to start: deeper overrides shallower.
+    chain = [root]
+    try:
+        for part in start_dir.resolve().relative_to(root.resolve()).parts:
+            chain.append(chain[-1] / part)
+    except ValueError:
+        # start is not under git_root; the root's rules are all that apply.
+        pass
+
+    verdict = dict.fromkeys(_SOURCE_FILENAME_SAMPLES, None)  # type: dict[str, bool | None]
+    for directory in chain:
+        attributes = directory / ".gitattributes"
+        if not attributes.is_file():
+            continue
+        try:
+            lines = attributes.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            pattern, _, rest = stripped.partition(" ")
+            if not rest.strip():
+                continue
+            settled = _attribute_protects(rest)
+            if settled is None:
+                continue
+            for sample in _SOURCE_FILENAME_SAMPLES:
+                if _matches(pattern, sample):
+                    verdict[sample] = settled
+
+    if all(verdict.values()):
+        return PROTECTION_PROTECTED
+    return PROTECTION_UNPROTECTED

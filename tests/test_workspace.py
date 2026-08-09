@@ -272,3 +272,121 @@ def test_strip_export_headers_keeps_a_dollar_line_inside_the_body() -> None:
     text = "$PBExportHeader$w.srw\r\nforward\r\n$PBExportComments$ not a header\r\n"
     body, _comment = ws.strip_export_headers(text)
     assert "$PBExportComments$ not a header" in body
+
+
+# --- Line-ending protection -------------------------------------------------
+#
+# The property these pin is the one that hid a real defect three times: git
+# translating .sr* line endings means `git status` can stay clean while the
+# .pbl and its projection disagree, so a correct write looks like a no-op.
+
+
+def _git_repo(tmp_path: Path, attributes: str | None = None) -> Path:
+    """A directory that `find_git_root` accepts, optionally with attributes."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".git").mkdir()
+    if attributes is not None:
+        (tmp_path / ".gitattributes").write_text(attributes, encoding="utf-8")
+    return tmp_path
+
+
+def test_protection_reports_no_git_outside_a_working_tree(tmp_path: Path) -> None:
+    assert ws.line_ending_protection(tmp_path, None) == ws.PROTECTION_NO_GIT
+
+
+def test_protection_unprotected_without_gitattributes(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path)
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        "*.sr* binary\n",
+        "*.sr* -text\n",
+        "*.sr* text=false\n",
+        "*.sr* text eol=crlf\n",
+        # Every extension spelled out instead of the glob.
+        "".join(f"*.sr{c} binary\n" for c in "adfmqsuw"),
+    ],
+)
+def test_protection_recognizes_every_way_of_exempting_sources(tmp_path: Path, rule: str) -> None:
+    root = _git_repo(tmp_path, rule)
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_PROTECTED
+
+
+def test_text_auto_alone_is_not_protection(tmp_path: Path) -> None:
+    """`* text=auto eol=lf` is the common setup that causes the problem.
+
+    It looks deliberate, which is why it is worth a test: it configures the
+    translation rather than exempting anything from it.
+    """
+    root = _git_repo(tmp_path, "* text=auto eol=lf\n")
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+
+
+def test_eol_lf_is_not_protection(tmp_path: Path) -> None:
+    """The trap: a deliberate line-ending policy that is the wrong one.
+
+    ORCA writes CRLF. With `eol=lf` git hands the file back as LF on every
+    checkout, so the projection and the .pbl disagree permanently. `eol=crlf`
+    is the same policy pointed the safe way.
+    """
+    root = _git_repo(tmp_path / "lf", "*.sr* text eol=lf\n")
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+
+    root2 = _git_repo(tmp_path / "crlf", "*.sr* text eol=crlf\n")
+    assert ws.line_ending_protection(root2, str(root2)) == ws.PROTECTION_PROTECTED
+
+
+def test_last_matching_line_wins(tmp_path: Path) -> None:
+    """git resolves attributes with the last match, so a later rule can undo."""
+    root = _git_repo(tmp_path, "*.sr* binary\n* text=auto\n")
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+
+    root2 = _git_repo(tmp_path / "b", "* text=auto\n*.sr* binary\n")
+    assert ws.line_ending_protection(root2, str(root2)) == ws.PROTECTION_PROTECTED
+
+
+def test_partial_coverage_is_not_protection(tmp_path: Path) -> None:
+    """Exempting only some extensions leaves the rest translated.
+
+    A half-covered tree is the worst case to report as safe: the files that
+    are still translated are exactly the ones nobody will think to check.
+    """
+    root = _git_repo(tmp_path, "*.srw binary\n*.sru binary\n")
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_UNPROTECTED
+
+
+def test_comments_and_blank_lines_are_ignored(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path, "# keep PB sources byte-exact\n\n*.sr* binary\n")
+    assert ws.line_ending_protection(root, str(root)) == ws.PROTECTION_PROTECTED
+
+
+def test_deeper_gitattributes_overrides_the_root(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path, "* text=auto eol=lf\n")
+    deep = root / "ws_objects" / "app.pbl.src"
+    deep.mkdir(parents=True)
+    (deep / ".gitattributes").write_text("*.sr* binary\n", encoding="utf-8")
+    assert ws.line_ending_protection(deep, str(root)) == ws.PROTECTION_PROTECTED
+
+
+def test_describe_surfaces_protection_and_warns_in_advice(tmp_path: Path) -> None:
+    root = _git_repo(tmp_path)
+    _pbw(root)
+    lib = root / "app.pbl"
+    lib.write_bytes(b"")
+    _source_file(root / ws.WS_OBJECTS_DIRNAME / "app.pbl.src", "w_main.srw")
+
+    info = ws.describe(lib)
+    assert info.source_protection == ws.PROTECTION_UNPROTECTED
+    assert "WARNING" in info.advice
+    assert "renormalize" in info.advice
+    # The layout advice is still there — the warning leads, it does not replace.
+    assert "Text projection present" in info.advice
+    assert info.to_dict()["source_protection"] == ws.PROTECTION_UNPROTECTED
+
+    (root / ".gitattributes").write_text("*.sr* binary\n", encoding="utf-8")
+    clean = ws.describe(lib)
+    assert clean.source_protection == ws.PROTECTION_PROTECTED
+    assert "WARNING" not in clean.advice

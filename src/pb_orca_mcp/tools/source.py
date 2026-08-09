@@ -57,6 +57,15 @@ def pb_workspace_info(lib_path: str) -> dict[str, Any]:
     where working files go when there is no projection. It touches no ORCA
     session, so it works before `pb_session_open` and without PowerBuilder
     installed.
+
+    Read `source_protection` before starting any edit loop. `unprotected` means
+    no `.gitattributes` rule exempts the `.sr*` files from git's line-ending
+    translation, so git stores them with LF and checks them out with CRLF: a
+    write can land in both the `.pbl` and its projection while `git status`
+    stays clean, and the drift only appears on someone else's checkout. `advice`
+    spells out the fix. This is a filesystem answer about whether the protection
+    exists, not a measurement of what the index already holds — for that, run
+    `git ls-files --eol` yourself.
     """
     try:
         info = ws.describe(lib_path)

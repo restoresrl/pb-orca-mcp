@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-08-09
+
+### Added
+
+- `pb_workspace_info` now reports **`source_protection`**: whether a
+  `.gitattributes` rule exempts the `.sr*` files from git's line-ending
+  translation. `unprotected` is the dangerous value and the quiet one — git
+  stores the sources with LF and checks them out with CRLF, so the index and
+  the working tree differ by exactly the bytes ORCA writes. A change lands in
+  the `.pbl` and in its projection while `git status` stays clean, and nobody
+  sees the drift until a fresh checkout.
+
+  This tool already answered "is git watching"; this is the other half of the
+  same question, and the half that decides whether a write is reviewable. It
+  is filesystem-only, like the rest of `workspace.py` — no `git` executable is
+  invoked, so it still works where git is not installed and it cannot hang. It
+  reports whether the protection *exists*; measuring what the index already
+  holds needs `git ls-files --eol`, which is left to the caller.
+
+  `eol=lf` counts as **unprotected**, which is the subtle case: it looks like
+  a deliberate line-ending policy and it is, just the wrong one, since ORCA
+  writes CRLF. `eol=crlf` is the same policy pointed the safe way. Partial
+  coverage — some `.sr*` extensions exempted, others not — also counts as
+  unprotected, because the files still being translated are exactly the ones
+  nobody will think to check.
+
+  `advice` leads with the warning and the fix when the value is `unprotected`.
+
+  Found by running a real review against a repository where 56 of 61 sources
+  were being normalized: nothing in the chain mentioned it.
+
 ## [0.2.2] - 2026-08-05
 
 ### Corrected
