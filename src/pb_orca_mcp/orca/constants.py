@@ -126,15 +126,29 @@ def entry_type_to_name(value: int) -> str:
     return ENTRY_TYPE_NAMES.get(value, f"unknown({value})")
 
 
+ENTRY_TYPE_ALIASES: dict[str, str] = {
+    # PowerScript's own name for a global function, as written in the source
+    # file it exports to: `global type gettext from function_object`. ORCA's
+    # API calls the same thing `function`. Anyone reading a `.srf` — a person
+    # or a model — reaches for the name the file uses, so accept it rather
+    # than rejecting a caller who read the truth off disk.
+    "function_object": "function",
+}
+
+
 def entry_type_from_name(name: str) -> int:
     """Resolve a string entry type name to its `PBORCA_TYPE` int.
 
-    Raises `ValueError` for unknown names (call sites validate caller input).
+    Accepts the PowerScript type names that differ from ORCA's API vocabulary
+    (see `ENTRY_TYPE_ALIASES`). Raises `ValueError` for unknown names (call
+    sites validate caller input).
     """
+    key = name.lower()
+    key = ENTRY_TYPE_ALIASES.get(key, key)
     try:
-        return ENTRY_TYPE_VALUES[name.lower()]
+        return ENTRY_TYPE_VALUES[key]
     except KeyError as exc:
-        valid = ", ".join(sorted(ENTRY_TYPE_VALUES))
+        valid = ", ".join(sorted(ENTRY_TYPE_VALUES) + sorted(ENTRY_TYPE_ALIASES))
         raise ValueError(f"unknown entry type {name!r}; valid: {valid}") from exc
 
 

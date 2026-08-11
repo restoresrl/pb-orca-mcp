@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-08-11
+
+### Corrected
+
+- **`function_object` was rejected as an entry type.** A `.srf` file opens
+  `global type gettext from function_object`, so that is the name anyone
+  naming the type reads off the source — while ORCA's API calls the same
+  thing `function`. The mismatch stopped an unattended apply loop dead on
+  every global-function finding, with an error listing twelve valid names and
+  not the one the file uses. Accepted as an alias now, and it appears in the
+  error text so the next mismatch documents itself.
+- The `advice` from `pb_workspace_info` told callers to run
+  `git add --renormalize` with no pathspec — the exact form the skills that
+  read this advice call an error, because bare it fails and the obvious repair
+  (`git add --renormalize .`) stages every modified file, including review
+  output that was deliberately left uncommitted. It carries the pathspec now.
+
 ## [0.2.5] - 2026-08-09
 
 ### Corrected

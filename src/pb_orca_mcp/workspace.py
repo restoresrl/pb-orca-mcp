@@ -119,7 +119,7 @@ class WorkspaceInfo:
     tree differ by exactly the bytes ORCA writes: a change can land in the
     `.pbl` and its projection while `git status` stays clean, and the drift is
     invisible until someone else checks the tree out. Fix it with a
-    `*.sr* -text` rule plus `git add --renormalize`, in its own commit,
+    `*.sr* -text` rule plus `git add --renormalize -- '*.sr*' '*.pbl' '*.pbd'`, in its own commit,
     *before* any write loop.
 
     Use `-text`, not `binary`. Both stop the translation, but `binary` also
@@ -170,7 +170,8 @@ class WorkspaceInfo:
                 "index disagrees with the working tree by exactly the bytes ORCA "
                 "writes. A change can land while `git status` stays clean, and the "
                 "drift only surfaces on someone else's checkout. Add `*.sr* -text` "
-                "(and `*.pbl`, `*.pbd` as `binary`), then run `git add --renormalize` "
+                "(and `*.pbl`, `*.pbd` as `binary`), then run "
+                "`git add --renormalize -- '*.sr*' '*.pbl' '*.pbd'` "
                 "in its own commit, before any write loop. Use `-text` rather than "
                 "`binary` for the sources: both stop the translation, but `binary` "
                 "also suppresses the diff, which is the reason the projection exists. "
