@@ -427,3 +427,53 @@ def test_describe_surfaces_protection_and_warns_in_advice(tmp_path: Path) -> Non
     assert clean.source_protection == ws.PROTECTION_PROTECTED
     assert clean.sources_diffable is True
     assert "WARNING" not in clean.advice
+
+
+def test_flat_tree_fallback_does_not_match_a_namesake_elsewhere(tmp_path: Path) -> None:
+    """A vendored library must not adopt another library's projection.
+
+    The fallback that finds a projection anywhere under `ws_objects/` exists
+    for workspaces keeping a flat tree. Matching on the directory name alone
+    made it hand a vendored `dep/pbunit/pbunit.pbl` the sources of an
+    unrelated `src/test/pbunit.pbl`: the caller was told the library keeps
+    text sources, `outside_source_tree` came back false for a library plainly
+    outside the tree, and an export without `dest_dir` would have overwritten
+    the other library's sources.
+
+    Seen on a real product workspace with 53 libraries, where `pbunit.pbl`
+    exists both as a vendored dependency and as a test-support library.
+    """
+    root = tmp_path
+    _pbw(root)
+    (root / "dep" / "pbunit").mkdir(parents=True)
+    (root / "dep" / "pbunit" / "pbunit.pbl").write_bytes(b"")
+    (root / "src" / "test").mkdir(parents=True)
+    (root / "src" / "test" / "pbunit.pbl").write_bytes(b"")
+    _source_file(root / ws.WS_OBJECTS_DIRNAME / "src" / "test" / "pbunit.pbl.src", "t_case.sru")
+
+    vendored = ws.describe(root / "dep" / "pbunit" / "pbunit.pbl")
+    assert vendored.mode == "pbl_only"
+    assert vendored.outside_source_tree is True
+    assert "test" not in vendored.sources.source_dir.replace(str(root), "")
+
+    real = ws.describe(root / "src" / "test" / "pbunit.pbl")
+    assert real.mode == "ws_objects"
+    assert real.outside_source_tree is False
+
+
+def test_flat_tree_fallback_still_works(tmp_path: Path) -> None:
+    """The case the fallback exists for: projection flatter than the library.
+
+    `<root>/src/app.pbl` projecting to `ws_objects/app.pbl.src` rather than
+    `ws_objects/src/app.pbl.src`. The found location's path segments are a
+    prefix of the expected ones, so it is the same place written shorter.
+    """
+    root = tmp_path
+    _pbw(root)
+    (root / "src").mkdir()
+    (root / "src" / "app.pbl").write_bytes(b"")
+    _source_file(root / ws.WS_OBJECTS_DIRNAME / "app.pbl.src", "w_main.srw")
+
+    info = ws.describe(root / "src" / "app.pbl")
+    assert info.mode == "ws_objects"
+    assert info.sources.exists is True

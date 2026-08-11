@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-08-11
+
+### Corrected
+
+- **A vendored library could adopt another library's sources.** The fallback
+  that locates a projection anywhere under `ws_objects/` — there for
+  workspaces keeping a flat tree — matched on the directory name alone. So
+  `dep/pbunit/pbunit.pbl`, a vendored dependency with no projection of its
+  own, was handed `ws_objects/src/test/pbunit.pbl.src`, which belongs to an
+  unrelated library that happens to share a basename.
+
+  Three wrong answers followed from one: `mode` said the library keeps text
+  sources, `sources.source_dir` pointed at somebody else's, and
+  `outside_source_tree` came back `false` for a library squarely outside the
+  source tree — defeating the check that exists to stop an edit from landing
+  in a dependency. An export with no `dest_dir` would have overwritten the
+  other library's sources.
+
+  The fallback now requires the found location's path segments to be a
+  *prefix* of the expected ones, which is what "the same place, written
+  flatter" actually means. Found on a real product workspace with 53
+  libraries, where `pbunit.pbl` exists both as a vendored dependency and as a
+  test-support library.
+
 ## [0.2.6] - 2026-08-11
 
 ### Corrected

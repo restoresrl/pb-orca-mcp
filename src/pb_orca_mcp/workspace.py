@@ -310,9 +310,41 @@ def locate_source_dir(lib_path: str | os.PathLike[str], root: str | os.PathLike[
         matches = sorted(
             p for p in ws_objects.rglob(f"*{SOURCE_DIR_SUFFIX}") if p.name.lower() == wanted
         )
-        if matches:
-            return matches[0]
+        expected_parent = computed.parent
+        for match in matches:
+            if _is_flatter_variant(match.parent, expected_parent, ws_objects):
+                return match
     return computed
+
+
+def _is_flatter_variant(found_parent: Path, expected_parent: Path, ws_objects: Path) -> bool:
+    """Is `found_parent` the same location as `expected_parent`, only flatter?
+
+    The fallback above exists for workspaces that keep a flat projection tree:
+    `<root>/src/app.pbl` projecting to `ws_objects/app.pbl.src` rather than to
+    `ws_objects/src/app.pbl.src`. Those differ by dropping leading path
+    segments, so the found location's segments must be a *prefix* of the
+    expected ones.
+
+    Matching on the directory name alone is not enough, and the failure is
+    severe rather than cosmetic. A vendored library at `dep/pbunit/pbunit.pbl`
+    — no projection of its own, which is what makes it a vendored dependency —
+    matched `ws_objects/src/test/pbunit.pbl.src`, the projection of a
+    *different* library that happens to share a basename. The caller was then
+    told the library keeps text sources, was handed another library's source
+    directory, and `outside_source_tree` came back `false` for a library that
+    is squarely outside the source tree. An export with no `dest_dir` would
+    have overwritten the other library's sources.
+
+    Seen on a real product workspace with 53 libraries, where `pbunit.pbl`
+    exists both as a vendored dependency and as a test-support library.
+    """
+    try:
+        found = found_parent.resolve().relative_to(ws_objects).parts
+        expected = expected_parent.resolve().relative_to(ws_objects).parts
+    except ValueError:
+        return False
+    return expected[: len(found)] == found
 
 
 def describe(lib_path: str | os.PathLike[str]) -> WorkspaceInfo:
