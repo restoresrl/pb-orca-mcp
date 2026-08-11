@@ -12,6 +12,20 @@ setup, the `pytest` / `ruff` / `mypy` checks, code style, and the PR process.
 This file does not restate it; it adds only the domain knowledge that guide is
 not the place for.
 
+**One thing is restated, because leaving it a pointer did not work.** Before
+you commit, run all four — CI runs exactly these, and passing three of them is
+how three tagged releases went out on a red build:
+
+```pwsh
+pytest                          # PB-dependent tests auto-skip
+ruff check src tests
+ruff format --check src tests   # the one that gets forgotten
+mypy src
+```
+
+And **look at CI after you push**. A green local run is evidence about your
+machine, not about the build.
+
 ## Context
 
 `pb-orca-mcp` is a **Python MCP server** that exposes PowerBuilder's ORCA API

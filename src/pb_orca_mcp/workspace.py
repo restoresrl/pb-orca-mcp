@@ -180,13 +180,12 @@ class WorkspaceInfo:
         if not self.sources_diffable:
             return (
                 "WARNING: a .gitattributes rule marks the .sr* files `binary` (or "
-                "`-diff`), so git reports \"Binary files differ\" instead of showing "
+                '`-diff`), so git reports "Binary files differ" instead of showing '
                 "what changed. The bytes are safe, but a PowerBuilder change cannot "
                 "be read in a diff or a pull request — which is what the text "
                 "projection is for. Use `-text` on the sources instead: it stops the "
                 "line-ending translation just as well and leaves the diff readable. "
-                "Keep `binary` for *.pbl and *.pbd. "
-                + self._layout_advice
+                "Keep `binary` for *.pbl and *.pbd. " + self._layout_advice
             )
         return self._layout_advice
 
@@ -587,9 +586,7 @@ def _matches(pattern: str, filename: str) -> bool:
     return fnmatch(filename, pattern.lstrip("/"))
 
 
-def line_ending_protection(
-    start: str | os.PathLike[str], git_root: str | None
-) -> tuple[str, bool]:
+def line_ending_protection(start: str | os.PathLike[str], git_root: str | None) -> tuple[str, bool]:
     """Are the `.sr*` files exempt from git's line-ending translation?
 
     Walks the `.gitattributes` files from the git root down to `start`, the way

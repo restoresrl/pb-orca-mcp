@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-08-11
+
+### Corrected
+
+- Formatting only, but it earns an entry for what it revealed: **v0.2.5,
+  v0.2.6 and v0.2.7 were all tagged on a red build.** The lint job's
+  `ruff format --check` step had been failing since 2026-08-09 while the three
+  test matrices and `ruff check` passed — so nothing in the code was wrong,
+  and nothing in the process caught it either. `CONTRIBUTING.md` had listed
+  all four commands the whole time; three of them were being run.
+
+  Those tags stay where they are and remain functionally correct. This one
+  exists so the current pin points at a green build, which is most of what a
+  tag is for.
+
+  `AGENTS.md` now restates the four commands rather than pointing at the guide
+  that holds them, and says to check CI after pushing: a green local run is
+  evidence about one machine.
+
 ## [0.2.7] - 2026-08-11
 
 ### Corrected
