@@ -59,6 +59,10 @@ from pb_orca_mcp.orca.types import (
     PBORCA_SCC,
 )
 
+#: Icon handed to `PBORCA_ExecutableCreate` when the caller gives none:
+#: ORCA answers `PBORCA_INVALIDPARMS` to a NULL icon name.
+DEFAULT_ICON = os.path.join(os.path.dirname(os.path.dirname(__file__)), "resources", "default.ico")
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -692,33 +696,66 @@ class Session:
         flags: list[str] | None = None,
         pbd_flags: list[list[str]] | None = None,
         exe_info: dict[str, str | None] | None = None,
+        pbd: list[bool] | None = None,
     ) -> tuple[bool, list[dict[str, Any]]]:
         """`PBORCA_ExecutableCreate` with optional `SetExeInfo` first.
 
         - `flags`: build flag names for the EXE itself (`machine_code`,
           `optimize_speed`, `trace_info`, `error_context`, `x64`, …; see
           `BUILD_FLAG_NAMES`).
-        - `pbd_flags`: per-PBD flag-name lists (one inner list per PBL the
-          application links via the library list, excluding the application
-          PBL itself). If supplied, ORCA generates a `.pbd` per element
-          with that flag set; if `None`, no PBDs are built.
+        - `pbd`: one boolean per library in the session library list, in
+          order: `True` means "already built as a PBD or DLL, leave its
+          objects out of the exe", `False` means "link its objects in".
+          That is what ORCA's `iPBDFlags` array is (0/1 per library, and
+          `iNumberOfPBDFlags` must equal the library count); it never
+          generated PBDs, `build_dynamic_library` does. `None` links every
+          library into the exe.
+        - `pbd_flags`: legacy spelling. Only flag masks 0 and 1 are
+          accepted (`[]` and `["machine_code"]`). Use `pbd` instead;
+          these entries select libraries, not compilation options.
+        - `icon_name`: ORCA returns `PBORCA_INVALIDPARMS` for a NULL icon,
+          so `None` uses the bundled `resources/default.ico`.
         - `exe_info`: if not `None`, calls `set_exe_info` before
           `ExecutableCreate`.
+
+        An existing output is rejected before calling ORCA. Build to a
+        new path, check the result, then replace the old deployment
+        explicitly. Failed builds may leave a partial file at the new path.
 
         Returns `(success, link_errors)`; per-error dicts carry
         `message_text`.
         """
         state = self._require_open("build_executable")
         flag_int = build_flags_from_names(flags)
+        if os.path.lexists(exe_name):
+            raise ValueError(
+                f"output already exists: {exe_name}; build to a new path and "
+                "replace the old deployment only after a successful build"
+            )
+        n_libs = len(state.library_list or ())
+        if not n_libs:
+            raise SessionStateError("set the library list before building an executable")
+        if pbd is not None and pbd_flags is not None:
+            raise ValueError("pass pbd or pbd_flags, not both")
+        if pbd_flags is not None:
+            legacy = [build_flags_from_names(p) for p in pbd_flags]
+            if any(value not in (0, 1) for value in legacy):
+                raise ValueError("pbd_flags entries must encode 0 or 1; use pbd booleans instead")
+            pbd = [bool(value) for value in legacy]
+        if pbd is None:
+            pbd = [False] * n_libs
+        if len(pbd) != n_libs:
+            raise ValueError(
+                f"pbd has {len(pbd)} entries but the library list has {n_libs}; "
+                "ORCA wants exactly one per library"
+            )
+        pbd_array_type = ctypes.c_int * max(len(pbd), 1)
+        pbd_array = pbd_array_type(*[1 if x else 0 for x in pbd])
+        num_pbd = len(pbd)
+        if icon_name is None:
+            icon_name = str(DEFAULT_ICON)
         if exe_info is not None:
             self.set_exe_info(exe_info)
-        if pbd_flags:
-            pbd_array_type = ctypes.c_int * len(pbd_flags)
-            pbd_array = pbd_array_type(*[build_flags_from_names(p) for p in pbd_flags])
-            num_pbd = len(pbd_flags)
-        else:
-            pbd_array = None
-            num_pbd = 0
         callback, errors = self._make_linkproc(state)
         try:
             rc = state.api.build.ExecutableCreate(

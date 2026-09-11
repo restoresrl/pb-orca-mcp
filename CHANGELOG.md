@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-09-11
+
+### Corrected
+
+- `pb_executable_create` could not build an exe from a plain call. Three
+  things were wrong at once, found while building the first `pb-test`
+  target through this server:
+  - the `iPBDFlags` array was read as "per-PBD build flags" and skipped
+    when empty. ORCA's manual says it is one integer per library in the
+    session library list, `0` to link the library in and `1` for a library
+    already deployed as a PBD/DLL, and `iNumberOfPBDFlags` must equal the
+    library count. A short or missing array is `PBORCA_INVALIDPARMS`. New
+    `pbd: list[bool]` argument with that meaning; omitted means "link
+    everything". Legacy `pbd_flags` accepts only masks 0 and 1;
+    conflicting arguments and other masks fail before calling ORCA.
+  - a NULL icon name is `PBORCA_INVALIDPARMS` too. `icon_name=None` now
+    uses a bundled `resources/default.ico`.
+  - Rebuilding an existing exe returned "Create of executable file
+    failed" in the live probe. The wrapper now rejects an existing
+    output without changing it. Build to a new location and replace the
+    deployment explicitly after success. The initial local patch deleted
+    the old exe first; review removed that unsafe behaviour before release.
+  Build probes used PB 2019 R3 and 2022 R3. The ORCA reference
+  (`orca.pdf` in the SDK) defines the per-library 0/1 array.
+
 ## [0.2.8] - 2026-08-11
 
 ### Corrected

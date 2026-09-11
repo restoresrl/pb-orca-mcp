@@ -513,10 +513,23 @@ a caller discarded the originating response.
 
 ## Build artifacts
 
-### `pb_executable_create(exe_name, *, icon_name=None, pbr_name=None, flags=None, pbd_flags=None, exe_info=None)`
+### `pb_executable_create(exe_name, *, icon_name=None, pbr_name=None, flags=None, pbd=None, pbd_flags=None, exe_info=None)`
 
 Build a standalone `.exe` for the current application. Returns
 `{"success", "exe_name", "errors": [...]}` with link errors when present.
+
+Two things ORCA insists on and the wrapper supplies: the icon name must
+not be NULL (`icon_name=None` uses a bundled default icon), and the
+`iPBDFlags` array must have exactly one entry per library in the session
+library list (see `pbd` below).
+
+The wrapper rejects an existing output with `PB_ORCA_MCP_INVALIDARGS`
+before calling ORCA and leaves it unchanged. Build in a new directory
+with the intended executable name, then replace the deployment only
+after checking `success`, diagnostics and runtime configuration files.
+A failed build may leave a partial file in that new directory. This is
+not an atomic deployment operation; do not build concurrently to the
+same destination.
 
 `flags`: list of flag names OR-folded into `lFlags`:
 
@@ -530,9 +543,17 @@ Build a standalone `.exe` for the current application. Returns
 | `new_visual_style` | `PBORCA_NEW_VISUAL_STYLE_CONTROLS` | Use XP-and-later visual style controls |
 | `x64` | `PBORCA_X64` | x64 deployment |
 
-`pbd_flags`: list-of-lists of flag names, one inner list per non-application
-PBL in the library list. When present, ORCA generates a `.pbd` per element.
-`None` (default) skips PBD generation.
+`pbd`: one boolean per library in the session library list, in order.
+`True` means the library is already deployed as a PBD or DLL and its
+objects stay out of the exe; `False` links them in. `None` (default) links
+every library. This is ORCA's `iPBDFlags` array; it does not generate PBDs,
+`pb_dynamic_library_create` does, and it must run first for any library
+marked `True`.
+
+`pbd_flags`: the earlier reading of the same argument as per-PBD build
+flags. For compatibility, `[]` maps to `False` and `["machine_code"]`
+maps to `True`, preserving the integer values 0 and 1. Other masks are
+invalid, and passing both arguments is an error. Use `pbd`.
 
 `exe_info`: optional dict for the EXE's Windows `VS_VERSION_INFO` resource:
 `company_name`, `product_name`, `description`, `copyright`, `file_version`,

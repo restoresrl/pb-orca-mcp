@@ -71,7 +71,8 @@ class _FakeBuild:
         lflags: int,
         pbcpara: Any,
     ) -> int:
-        self.calls.append(("ExecutableCreate", (handle, exe, icon, pbr, n_pbd, lflags)))
+        pbd_values = tuple(pbd_arr[i] for i in range(n_pbd)) if pbd_arr is not None else ()
+        self.calls.append(("ExecutableCreate", (handle, exe, icon, pbr, n_pbd, lflags, pbd_values)))
         self._live.clear()
         for text in self.fake_link_errors:
             rec = PBORCA_LINKERR()
@@ -147,6 +148,8 @@ def open_session() -> Session:
     Session._instance = None
     s = Session.instance()
     s.open(_FakeApi())  # type: ignore[arg-type]
+    assert s._state is not None
+    s._state.library_list = ("app.pbl",)
     return s
 
 
@@ -242,3 +245,90 @@ def test_callback_refs_emptied_after_query(open_session: Session) -> None:
     api.build.fake_ancestors = ["base"]
     open_session.object_query_hierarchy("foo.pbl", "derived", "userobject")
     assert open_session._state.callback_refs == []  # type: ignore[union-attr]
+
+
+# --- Per-library flags, default icon and output preservation -----------------
+
+
+def test_build_executable_defaults_one_zero_per_library(open_session: Session) -> None:
+    """ORCA wants exactly one iPBDFlags entry per library; omitted `pbd` links all."""
+    open_session._state.library_list = ("app.pbl", "lib1.pbl", "lib2.pbl")  # type: ignore[union-attr]
+    open_session.build_executable("out.exe")
+    call = open_session._state.api.build.calls[-1]  # type: ignore[union-attr]
+    assert call[1][4] == 3
+    assert call[1][6] == (0, 0, 0)
+
+
+def test_build_executable_pbd_marks_prebuilt_libraries(open_session: Session) -> None:
+    open_session._state.library_list = ("app.pbl", "lib1.pbl", "lib2.pbl")  # type: ignore[union-attr]
+    open_session.build_executable("out.exe", pbd=[False, True, True])
+    call = open_session._state.api.build.calls[-1]  # type: ignore[union-attr]
+    assert call[1][6] == (0, 1, 1)
+
+
+def test_build_executable_pbd_flags_compat_maps_to_booleans(open_session: Session) -> None:
+    open_session._state.library_list = ("app.pbl", "lib1.pbl")  # type: ignore[union-attr]
+    open_session.build_executable("out.exe", pbd_flags=[[], ["machine_code"]])
+    call = open_session._state.api.build.calls[-1]  # type: ignore[union-attr]
+    assert call[1][6] == (0, 1)
+
+
+def test_build_executable_pbd_length_must_match_library_list(open_session: Session) -> None:
+    open_session._state.library_list = ("app.pbl", "lib1.pbl")  # type: ignore[union-attr]
+    with pytest.raises(ValueError, match="one per library"):
+        open_session.build_executable("out.exe", pbd=[False])
+
+
+def test_build_executable_default_icon_is_bundled(open_session: Session) -> None:
+    from pathlib import Path
+
+    open_session.build_executable("out.exe")
+    call = open_session._state.api.build.calls[-1]  # type: ignore[union-attr]
+    icon = call[1][2]
+    assert icon is not None and icon.endswith("default.ico")
+    assert Path(icon).is_file()
+
+
+@pytest.mark.parametrize("rc", [PBORCA_OK, PBORCA_LINKERROR, PBORCA_OBJNOTFOUND])
+def test_build_executable_preserves_existing_exe(
+    open_session: Session, tmp_path: Any, rc: int
+) -> None:
+    from pb_orca_mcp.tools.build import pb_executable_create
+
+    exe = tmp_path / "out.exe"
+    exe.write_bytes(b"old deployment")
+    assert open_session._state is not None
+    api = open_session._state.api
+    api.build.exe_rc = rc
+    result = pb_executable_create(str(exe), exe_info={"product_name": "test"})
+    assert result["error"]["name"] == "PB_ORCA_MCP_INVALIDARGS"
+    assert "output already exists" in result["error"]["message"]
+    assert exe.read_bytes() == b"old deployment"
+    assert api.build.calls == []
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"pbd": [False], "pbd_flags": [[]]},
+        {"pbd_flags": [["optimize_speed"]]},
+        {"pbd_flags": [["not_a_flag"]]},
+        {"pbd": []},
+    ],
+)
+def test_build_executable_invalid_flags_do_not_call_orca(
+    open_session: Session, kwargs: dict[str, Any]
+) -> None:
+    with pytest.raises(ValueError):
+        open_session.build_executable("out.exe", exe_info={}, **kwargs)
+    assert open_session._state is not None
+    assert open_session._state.api.build.calls == []
+
+
+def test_build_executable_requires_library_list(open_session: Session) -> None:
+    from pb_orca_mcp.orca.session import SessionStateError
+
+    assert open_session._state is not None
+    open_session._state.library_list = None
+    with pytest.raises(SessionStateError, match="library list"):
+        open_session.build_executable("out.exe")

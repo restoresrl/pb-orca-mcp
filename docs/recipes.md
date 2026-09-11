@@ -215,10 +215,9 @@ After the rebuild is clean:
   "icon_name": "C:\\proj\\res\\myapp.ico",
   "pbr_name": "C:\\proj\\res\\myapp.pbr",
   "flags": ["machine_code", "optimize_speed", "error_context"],
-  "pbd_flags": [
-    ["machine_code", "optimize_speed"],   // first non-app PBL → .pbd
-    ["machine_code"]                       // second non-app PBL → .pbd
-  ],
+  "pbd": [false, true, true],   // one per library in the list: myapp.pbl linked in,
+                                // the two dependencies already built as PBD/DLL
+                                // with pb_dynamic_library_create
   "exe_info": {
     "company_name": "Acme Corp", "product_name": "MyApp",
     "file_version": "1.4.2", "file_version_num": "1.4.2.0",
@@ -239,6 +238,11 @@ For a quick "does it link" run, drop the dressing:
 {"tool": "pb_executable_create", "args": {
   "exe_name": "C:\\proj\\dist\\myapp.exe", "flags": ["machine_code"]}}
 ```
+
+That links every library into the exe and uses a bundled icon. The
+output must not exist. To preserve a working deployment, build in a
+new directory with the same executable name. Check the build result
+and runtime configuration before replacing any deployed files.
 
 P-code is the default and is the right choice for the inner loop, where build
 time matters more than runtime speed.

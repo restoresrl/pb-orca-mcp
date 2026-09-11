@@ -1,17 +1,22 @@
 """MCP tools for building EXE / PBD artifacts.
 
 Tools:
-- `pb_executable_create(exe_name, *, icon_name, pbr_name, flags, pbd_flags, exe_info)`
+- `pb_executable_create(exe_name, *, icon_name, pbr_name, flags, pbd, pbd_flags, exe_info)`
 - `pb_dynamic_library_create(lib_path, *, pbr_name, flags)`
 
 Flag names accepted (see `BUILD_FLAG_NAMES`):
   `machine_code`, `trace_info`, `error_context`, `optimize_speed`,
   `optimize_space`, `new_visual_style`, `x64`. p-code is the default.
 
-`pbd_flags` is a list-of-lists: one inner list per PBL that the application
-links via the library list (excluding the application PBL itself). If
-provided, ORCA generates a `.pbd` per element with the given flags. Pass
-`None` (default) to skip PBD generation.
+`pbd` is one boolean per library in the session library list, in order:
+`True` for a library already deployed as a PBD/DLL (its objects stay out
+of the exe), `False` to link it in. `None` links everything. ORCA requires
+exactly one entry per library and a non-NULL icon; the wrapper fills both
+(a bundled default icon) so the plain call works. `pbd_flags` is the older
+list-of-lists spelling; only masks 0 and 1 are accepted.
+
+Existing outputs are rejected. Build to a new path, check the result, then
+replace the old deployment explicitly. A failure may leave a partial output.
 
 `exe_info` is an optional dict — if provided, the wrapper calls
 `PBORCA_SetExeInfo` before `ExecutableCreate`. Keys: `company_name`,
@@ -41,8 +46,17 @@ def pb_executable_create(
     flags: list[str] | None = None,
     pbd_flags: list[list[str]] | None = None,
     exe_info: dict[str, str | None] | None = None,
+    pbd: list[bool] | None = None,
 ) -> dict[str, Any]:
-    """Build a standalone `.exe` for the current application."""
+    """Build a standalone `.exe` for the current application.
+
+    `pbd`: one boolean per library in the session library list, `True` when
+    that library is already a PBD/DLL and must stay out of the exe. Omit it
+    to link every library in. `icon_name` defaults to a bundled icon because
+    ORCA rejected a NULL one in the tested builds. Existing outputs are
+    rejected without changes; use a new path and replace the old deployment
+    only after success. A failed build may leave a partial new output.
+    """
     session = Session.instance()
     try:
         success, errors = session.build_executable(
@@ -52,6 +66,7 @@ def pb_executable_create(
             flags=flags,
             pbd_flags=pbd_flags,
             exe_info=exe_info,
+            pbd=pbd,
         )
     except SessionStateError as exc:
         return _error("PB_ORCA_MCP_STATEERROR", str(exc))
